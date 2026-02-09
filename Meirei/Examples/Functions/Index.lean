@@ -5,4 +5,5 @@ import PredictableVerification.Examples.Functions.Fibonacci
 import PredictableVerification.Examples.Functions.Effectful
 import PredictableVerification.Examples.Functions.EffectMParameterized
 import PredictableVerification.Examples.Functions.ComplexEarlyExit
+import PredictableVerification.Examples.Functions.PrintASTExample
 -- import PredictableVerification.Examples.Functions.WorkingComplexExamples  -- Contains duplicates of ComplexEarlyExit examples

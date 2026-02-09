@@ -6,7 +6,7 @@
   last two Fibonacci numbers.
 -/
 
-import PredictableVerification.IR.Meirei.Elaborator
+import PredictableVerification.IR.Meirei.Elaborator.Index
 
 open Meirei
 

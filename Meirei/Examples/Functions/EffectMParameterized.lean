@@ -9,7 +9,7 @@
   This makes the error type part of the monad itself, similar to ExceptT.
 -/
 
-import PredictableVerification.IR.Meirei.Elaborator
+import PredictableVerification.IR.Meirei.Elaborator.Index
 
 namespace EffectMParameterized
 
