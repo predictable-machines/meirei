@@ -22,7 +22,7 @@ noncomputable def prodOfTwoWithEffect (x : Int) : EffectM Int := do
 -- ============================================================================
 
 noncomputable def prodOfTwoWithEffect' := [Meirei|
-  def prodOfTwoWithEffect(x: int) : int {
+  def prodOfTwoWithEffect(x: Int) : Int {
     y <- getY();
     return x * y;
   }
@@ -49,9 +49,9 @@ axiom recordSale : Int → EffectM Unit            -- Log a sale amount to audit
   3. Return total revenue
 -/
 noncomputable def processOrders := [Meirei|
-  def processOrders(orderAmounts: [int]) : int {
+  def processOrders(orderAmounts: [Int]) : Int {
     discountThreshold <- getDiscountThreshold();
-    var totalRevenue : int = 0;
+    var totalRevenue : Int = 0;
     for amount in orderAmounts {
       if (amount > discountThreshold) {
         multiplier <- getDiscountMultiplier();

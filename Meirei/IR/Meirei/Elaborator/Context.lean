@@ -76,9 +76,6 @@ def getVar (name : Name) : ElabM Ident := do
   match ctx.vars[name]? with
   | none => throw <| Macro.Exception.error (← getRef) s!"Variable {name} not found"
   | some info =>
-    if info.currentVersion == 0 then
-      return mkIdent name
-    else
-      return mkIdent (name.appendAfter s!"_{info.currentVersion}")
+    return mkIdent (name.appendAfter s!"_{info.currentVersion}")
 
 end Meirei.Elaborator

@@ -11,9 +11,8 @@
 
 import PredictableVerification.Examples.Functions.EarlyExit
 
--- NOTE: The imperative syntax now uses "int" (lowercase) as a keyword to avoid
--- conflicts with Lean's standard Int type. This allows us to use Int directly
--- in Lean code without needing escaped identifiers.
+-- NOTE: Meirei has no built-in types. Type names must start with uppercase
+-- (e.g. Int, String, Shape). This matches Lean's conventions directly.
 
 /-
   PATTERN: Find First Element Greater Than 10

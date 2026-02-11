@@ -20,9 +20,10 @@ open Meirei.AST
 /-- Elaborate MeireiType to Lean type -/
 def elabType (ty : MeireiType) : MacroM Term := do
   match ty with
-  | MeireiType.int => `(Int)
-  | MeireiType.list inner => do
-    let innerTy ← elabType inner
-    `(List $innerTy)
+  | MeireiType.named name => return mkIdent name
+  | MeireiType.app f arg => do
+    let fTy ← elabType f
+    let argTy ← elabType arg
+    `($fTy $argTy)
 
 end Meirei.Elaborator

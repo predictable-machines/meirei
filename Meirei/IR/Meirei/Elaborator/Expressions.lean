@@ -31,6 +31,9 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
       let lit := Lean.Syntax.mkNumLit (toString (-n))
       `(- $lit)
 
+  | MeireiExpr.stringLit s =>
+    return Lean.Syntax.mkStrLit s
+
   | MeireiExpr.var name => do
     let ctx ← get
     match ctx.vars[name]? with
@@ -40,10 +43,7 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
       | some origIdent =>
         return origIdent
       | none =>
-        if info.currentVersion == 0 && !ctx.inLoop then
-          return mkIdent info.name
-        else
-          return mkIdent (info.name.appendAfter s!"_{info.currentVersion}")
+        return mkIdent (info.name.appendAfter s!"_{info.currentVersion}")
 
   | MeireiExpr.binOp op lhs rhs => do
     let lhs' ← elabExpr lhs
@@ -63,6 +63,34 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
     for arg in args' do
       result ← `($result $arg)
     return result
+
+  | MeireiExpr.fieldAccess obj fieldName => do
+    let objTerm ← elabExpr obj
+    let fieldIdent := mkIdent fieldName
+    `($objTerm.$fieldIdent:ident)
+
+-- =============================================================================
+-- Condition Validation
+-- =============================================================================
+
+/-- Check that all variable references in a condition expression are in scope.
+    Unlike general expressions, conditions in while/if shouldn't reference
+    external names — only declared variables and parameters. -/
+partial def validateConditionVars (expr : MeireiExpr) : ElabM Unit := do
+  match expr with
+  | MeireiExpr.var name => do
+    let ctx ← get
+    if ctx.vars[name]?.isNone then
+      throw <| Macro.Exception.error (← getRef) s!"Unknown identifier '{name}'"
+  | MeireiExpr.binOp _ lhs rhs =>
+    validateConditionVars lhs
+    validateConditionVars rhs
+  | MeireiExpr.call _ args =>
+    for arg in args do
+      validateConditionVars arg
+  | MeireiExpr.fieldAccess obj _ =>
+    validateConditionVars obj
+  | MeireiExpr.intLit _ | MeireiExpr.stringLit _ => pure ()
 
 -- =============================================================================
 -- Expression Substitution (for Loop State Access)
@@ -93,11 +121,17 @@ partial def substituteVarInExpr (expr : MeireiExpr) (varName : Name) (replacemen
     else
       let lit := Lean.Syntax.mkNumLit (toString (-n))
       `(- $lit)
+  | MeireiExpr.stringLit s =>
+    return Lean.Syntax.mkStrLit s
   | MeireiExpr.call name args => do
     let args' ← args.mapM (substituteVarInExpr · varName replacement)
     let mut result ← `($(mkIdent name))
     for arg in args' do
       result ← `($result $arg)
     return result
+  | MeireiExpr.fieldAccess obj fieldName => do
+    let objTerm ← substituteVarInExpr obj varName replacement
+    let fieldIdent := mkIdent fieldName
+    `($objTerm.$fieldIdent:ident)
 
 end Meirei.Elaborator

@@ -11,12 +11,15 @@ import PredictableVerification.IR.Meirei.Elaborator.Index
 
 open Meirei
 
+-- Namespace avoids name collisions with ComplexEarlyExit (3 shared names)
+namespace WorkingComplexExamples
+
 -- =============================================================================
 -- Example 1: Nested If with Early Return
 -- =============================================================================
 
 def findFirstAbove10 := [Meirei|
-  def findFirstAbove10(nums: [int]): int {
+  def findFirstAbove10(nums: [Int]): Int {
     for x in nums {
       if (x > 5) {
         if (x > 10) {
@@ -40,8 +43,8 @@ def findFirstAbove10 := [Meirei|
 -- =============================================================================
 
 def productUntilZero := [Meirei|
-  def productUntilZero(nums: [int]): int {
-    var product: int = 1;
+  def productUntilZero(nums: [Int]): Int {
+    var product: Int = 1;
     for x in nums {
       if (x == 0) {
         break;
@@ -64,7 +67,7 @@ def productUntilZero := [Meirei|
 -- =============================================================================
 
 def findFirstInRange := [Meirei|
-  def findFirstInRange(nums: [int]): int {
+  def findFirstInRange(nums: [Int]): Int {
     for d in nums {
       if (d > 2) {
         if (d < 20) {
@@ -88,8 +91,8 @@ def findFirstInRange := [Meirei|
 -- =============================================================================
 
 def sumPositivesOnly := [Meirei|
-  def sumPositivesOnly(nums: [int]): int {
-    var total: int = 0;
+  def sumPositivesOnly(nums: [Int]): Int {
+    var total: Int = 0;
     for x in nums {
       if (x > 0) {
         total = total + x;
@@ -112,8 +115,8 @@ def sumPositivesOnly := [Meirei|
 -- =============================================================================
 
 def countNegatives := [Meirei|
-  def countNegatives(nums: [int]): int {
-    var count: int = 0;
+  def countNegatives(nums: [Int]): Int {
+    var count: Int = 0;
     for x in nums {
       if (x < 0) {
         count = count + 1;
@@ -136,8 +139,8 @@ def countNegatives := [Meirei|
 -- =============================================================================
 
 def decrementUntilZero := [Meirei|
-  def decrementUntilZero(nums: [int]): int {
-    var value: int = 100;
+  def decrementUntilZero(nums: [Int]): Int {
+    var value: Int = 100;
     for x in nums {
       if (value == 0) {
         break;
@@ -159,8 +162,8 @@ def decrementUntilZero := [Meirei|
 -- =============================================================================
 
 def maxBeforeSentinel := [Meirei|
-  def maxBeforeSentinel(nums: [int]): int {
-    var max: int = 0;
+  def maxBeforeSentinel(nums: [Int]): Int {
+    var max: Int = 0;
     for x in nums {
       if (x == -999) {
         break;
@@ -197,3 +200,5 @@ def maxBeforeSentinel := [Meirei|
 
   All 34 test cases pass with correct values!
 -/
+
+end WorkingComplexExamples

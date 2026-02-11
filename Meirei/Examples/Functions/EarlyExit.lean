@@ -37,7 +37,7 @@ open Meirei
 -/
 
 def findFirstGreaterThan10 := [Meirei|
-  def findFirstGreaterThan10(nums: [int]): int {
+  def findFirstGreaterThan10(nums: [Int]): Int {
     for x in nums {
       if (x > 10) {
         return x;
@@ -95,8 +95,8 @@ def findFirstGreaterThan10 := [Meirei|
 -/
 
 def sumUntilLarge := [Meirei|
-  def sumUntilLarge(nums: [int]): int {
-    var total: int = 0;
+  def sumUntilLarge(nums: [Int]): Int {
+    var total: Int = 0;
     for x in nums {
       if (x > 100) {
         break;
@@ -141,7 +141,7 @@ def sumUntilLarge := [Meirei|
 -/
 
 def findFirstSmall := [Meirei|
-  def findFirstSmall(nums: [int]): int {
+  def findFirstSmall(nums: [Int]): Int {
     for n in nums {
       if (n < 5) {
         return n;

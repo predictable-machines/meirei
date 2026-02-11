@@ -69,31 +69,48 @@ theorem fibTailHelper_eq_fibRec (n : Nat) :
 -- EQUIVALENCE TO FOLD-BASED VERSION
 -- =============================================================================
 
-/-- The actual fold step function as elaborated by Meirei -/
-def fibFoldStep (x : Nat × Nat) (_ : Nat) : Nat × Nat :=
-  match x with
-  | (a, b) => (b, a + b)
+-- Meirei elaborates `fib` using Int arithmetic (since `var a: Int = 0`), so the
+-- fold operates on `Int × Int` pairs. But `fibTailHelper`/`fibRec` use Nat.
+-- We bridge this with an Int-typed helper and a cast lemma:
+--   Int fold  ═══►  fibTailHelperInt  ═══►  ↑(fibTailHelper)  ═══►  ↑(fibRec)
 
--- Helper: folding over a list of length k with fibFoldStep is equivalent to fibTailHelper
-theorem foldl_fibFoldStep_length (l : List Nat) (a b : Nat) :
-    (List.foldl (fun x _ => match x with | (a, b) => (b, a + b)) (a, b) l).1 =
-    fibTailHelper l.length a b := by
+/-- Int version of fibTailHelper, matching the types used by Meirei-elaborated fib -/
+def fibTailHelperInt (n : Nat) (a b : Int) : Int :=
+  match n with
+  | 0 => a
+  | k + 1 => fibTailHelperInt k b (a + b)
+
+/-- Int fold step is equivalent to fibTailHelperInt -/
+theorem foldl_fib_int_step_length (l : List Nat) (a b : Int) :
+    (List.foldl (fun (x : Int × Int) (_ : Nat) => (x.2, x.1 + x.2)) (a, b) l).1 =
+    fibTailHelperInt l.length a b := by
   induction l generalizing a b with
-  | nil =>
-    simp [List.foldl, fibTailHelper, List.length]
+  | nil => simp [List.foldl, fibTailHelperInt]
   | cons _ xs ih =>
-    simp [List.foldl, List.length, fibTailHelper]
+    simp [List.foldl, fibTailHelperInt]
     exact ih b (a + b)
 
-/-- Key lemma: foldl computes Fibonacci correctly for non-negative Int -/
-theorem foldl_fib_eq_fibTailHelper (n : Int) (h : n ≥ 0) :
-    (List.foldl (fun x _ => match x with | (a, b) => (b, a + b)) (0, 1) (range n)).1 =
-    fibTailHelper n.toNat 0 1 := by
+/-- fibTailHelperInt on Nat casts equals the Nat cast of fibTailHelper -/
+theorem fibTailHelperInt_cast (n : Nat) (a b : Nat) :
+    fibTailHelperInt n (↑a) (↑b) = ↑(fibTailHelper n a b) := by
+  induction n generalizing a b with
+  | zero => simp [fibTailHelperInt, fibTailHelper]
+  | succ k ih =>
+    simp only [fibTailHelperInt, fibTailHelper]
+    push_cast
+    exact ih b (a + b)
+
+/-- Key lemma: Int foldl computes Fibonacci correctly for non-negative Int -/
+theorem foldl_fib_int_eq (n : Int) (h : n ≥ 0) :
+    (List.foldl (fun (x : Int × Int) (_ : Nat) => (x.2, x.1 + x.2))
+      ((0 : Int), (1 : Int)) (range n)).1 =
+    ↑(fibTailHelper n.toNat 0 1) := by
   unfold range
   have hneg : ¬(n < 0) := by omega
   simp [hneg]
-  rw [foldl_fibFoldStep_length]
+  rw [foldl_fib_int_step_length]
   simp [List.length_range]
+  exact fibTailHelperInt_cast n.toNat 0 1
 
 -- =============================================================================
 -- MAIN THEOREMS
@@ -105,13 +122,9 @@ theorem fib_eq_fibRecInt (n : Int) (h : n ≥ 0) :
   unfold fibRecInt
   have hneg : ¬(n < 0) := by omega
   simp only [hneg, ite_false]
-  -- fib elaborates to: have indices := range n; (List.foldl ... indices).1
-  -- We need to show this equals fibRec n.toNat
-  have h1 := foldl_fib_eq_fibTailHelper n h
+  have h1 := foldl_fib_int_eq n h
   have h2 := fibTailHelper_eq_fibRec n.toNat
-  -- Show fib n equals the fold result
-  unfold fib
-  simp only [h1, h2]
+  exact h1.trans (congrArg Nat.cast h2)
 
 /-- Corollary: equivalence for natural numbers -/
 theorem fib_eq_fibRec (n : Nat) :

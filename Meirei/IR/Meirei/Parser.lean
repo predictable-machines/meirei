@@ -15,14 +15,59 @@ namespace Meirei.Parser
 
 open Meirei.AST
 
+/-- Resolve a type name that may have trailing `?` characters (e.g. `Int?`, `Shape??`).
+    The tokenizer merges `T?` into a single ident, so we strip trailing `?` here.
+    Type names must start with an uppercase letter. -/
+private def resolveTypeName (name : String) : MacroM MeireiType := do
+  let numQuestions := name.toList.reverse.takeWhile (· == '?') |>.length
+  let baseName := name.dropRight numQuestions
+  match baseName.toList.head? with
+  | some c =>
+    if !c.isUpper then
+      Macro.throwError s!"Type names must start with an uppercase letter, got '{baseName}'"
+  | none => Macro.throwError s!"Empty type name"
+  let baseType := MeireiType.named (Name.mkSimple baseName)
+  let rec wrap (n : Nat) (ty : MeireiType) : MeireiType :=
+    match n with
+    | 0 => ty
+    | n + 1 => wrap n (MeireiType.app (MeireiType.named `Option) ty)
+  return wrap numQuestions baseType
+
 /-- Parse a type syntax to MeireiType -/
 partial def parseType (stx : TSyntax `imp_type) : MacroM MeireiType := do
   match stx with
-  | `(imp_type| int) => return MeireiType.int
   | `(imp_type| [ $ty:imp_type ]) => do
     let inner ← parseType ty
-    return MeireiType.list inner
+    return MeireiType.app (MeireiType.named `List) inner
+  | `(imp_type| $ty:imp_type ?) => do
+    let inner ← parseType ty
+    return MeireiType.app (MeireiType.named `Option) inner
+  | `(imp_type| $n:ident) => resolveTypeName n.getId.toString
   | _ => Macro.throwError s!"Unsupported type syntax: {stx}"
+
+/-- Try to extract a string literal from a syntax node, navigating wrapper nodes. -/
+private def extractStrLit (stx : Syntax) : Option String :=
+  -- Direct match
+  stx.isStrLit? <|>
+  -- One level deep (str wraps strLit atom)
+  stx[0]?.bind (·.isStrLit?) <|>
+  -- Choice node from parser ambiguity: check each alternative
+  (if stx.getKind == choiceKind then
+    stx.getArgs.findSome? fun alt =>
+      alt.isStrLit? <|> alt[0]?.bind (·.isStrLit?)
+  else none)
+
+mutual
+
+/-- Parse a function call argument (expression or string literal) -/
+partial def parseArg (stx : TSyntax `imp_arg) : MacroM MeireiExpr := do
+  -- Try string extraction first (handles choice nodes from ambiguity)
+  if let some s := extractStrLit stx.raw then
+    return MeireiExpr.stringLit s
+  -- Otherwise parse as expression
+  match stx with
+  | `(imp_arg| $e:imp_expr) => parseExpr e
+  | _ => Macro.throwError s!"Unsupported argument syntax: {stx}"
 
 /-- Parse an expression syntax to MeireiExpr -/
 partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
@@ -72,13 +117,31 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     return MeireiExpr.binOp BinOp.eq a' b'
 
   | `(imp_expr| $f:ident ( $args,* )) => do
-    let args' ← args.getElems.toList.mapM parseExpr
+    let args' ← args.getElems.toList.mapM parseArg
     return MeireiExpr.call f.getId args'
 
   | `(imp_expr| ( $e:imp_expr )) =>
     parseExpr e
 
-  | _ => Macro.throwError s!"Unsupported expression syntax: {stx}"
+  | `(imp_expr| $obj:imp_expr . $field:ident) => do
+    let obj' ← parseExpr obj
+    return MeireiExpr.fieldAccess obj' field.getId
+
+  | other =>
+    -- `syntax:max str : imp_expr` wraps the strLit in an imp_expr node.
+    -- Navigate one level to the `str` child where `isStrLit?` works.
+    if let some s := other.raw[0]?.bind Syntax.isStrLit? then
+      return MeireiExpr.stringLit s
+    Macro.throwError s!"Unsupported expression syntax: {other}"
+
+/-- Parse a match arm syntax to a MatchArm -/
+partial def parseMatchArm (stx : TSyntax `imp_match_arm) : MacroM MatchArm := do
+  match stx with
+  | `(imp_match_arm| case $ctorName:ident ( $bindings,* ) { $stmts* }) => do
+    let bindings' := bindings.getElems.toList.map (·.getId)
+    let body' ← stmts.toList.mapM parseStmt
+    return MatchArm.mk (MeireiPattern.ctor ctorName.getId bindings') body'
+  | _ => Macro.throwError s!"Invalid match arm syntax: {stx}"
 
 /-- Parse a statement syntax to MeireiStmt -/
 partial def parseStmt (stx : TSyntax `imp_stmt) : MacroM MeireiStmt := do
@@ -104,6 +167,14 @@ partial def parseStmt (stx : TSyntax `imp_stmt) : MacroM MeireiStmt := do
     let stmts' ← stmts.toList.mapM parseStmt
     return MeireiStmt.forLoop x.getId coll' stmts'
 
+  | `(imp_stmt| while ( $cond:imp_expr ) $[decreasing ( $decr:imp_expr )]? { $stmts* }) => do
+    let cond' ← parseExpr cond
+    let decr' ← match decr with
+      | some d => do pure (some (← parseExpr d))
+      | none => pure none
+    let stmts' ← stmts.toList.mapM parseStmt
+    return MeireiStmt.whileLoop cond' stmts' decr'
+
   | `(imp_stmt| if ( $cond:imp_expr ) { $stmts* }) => do
     let cond' ← parseExpr cond
     let stmts' ← stmts.toList.mapM parseStmt
@@ -120,14 +191,21 @@ partial def parseStmt (stx : TSyntax `imp_stmt) : MacroM MeireiStmt := do
     return MeireiStmt.block stmts'
 
   | `(imp_stmt| $f:ident ( $args,* ) ;) => do
-    let args' ← args.getElems.toList.mapM parseExpr
+    let args' ← args.getElems.toList.mapM parseArg
     return MeireiStmt.effectCall f.getId args'
 
   | `(imp_stmt| $y:ident <- $f:ident ( $args,* ) ;) => do
-    let args' ← args.getElems.toList.mapM parseExpr
+    let args' ← args.getElems.toList.mapM parseArg
     return MeireiStmt.effectBind y.getId f.getId args'
 
+  | `(imp_stmt| match $scrutinee:imp_expr { $arms* }) => do
+    let scrutinee' ← parseExpr scrutinee
+    let arms' ← arms.toList.mapM parseMatchArm
+    return MeireiStmt.match_ scrutinee' arms'
+
   | _ => Macro.throwError s!"Unsupported statement syntax: {stx}"
+
+end
 
 /-- Parse a parameter syntax to MeireiParam -/
 def parseParam (stx : TSyntax `imp_param) : MacroM MeireiParam := do
@@ -151,5 +229,37 @@ def parseFunDef (stx : TSyntax `imp_fundef) : MacroM MeireiFunDef := do
       body := body'
     }
   | _ => Macro.throwError s!"Invalid function definition syntax: {stx}"
+
+/-- Parse a field definition -/
+def parseFieldDef (stx : TSyntax `imp_field_def) : MacroM MeireiFieldDef := do
+  match stx with
+  | `(imp_field_def| $name:ident : $ty:imp_type) => do
+    let ty' ← parseType ty
+    return { name := name.getId, type := ty' }
+  | _ => Macro.throwError s!"Invalid field definition syntax: {stx}"
+
+/-- Parse an enum constructor -/
+def parseEnumCtor (stx : TSyntax `imp_enum_ctor) : MacroM MeireiEnumCtor := do
+  match stx with
+  | `(imp_enum_ctor| $name:ident ( $fields,* )) => do
+    let fields' ← fields.getElems.toList.mapM parseFieldDef
+    return { name := name.getId, fields := fields' }
+  | _ => Macro.throwError s!"Invalid enum constructor syntax: {stx}"
+
+/-- Parse a struct definition -/
+def parseStructDef (stx : TSyntax `imp_struct_def) : MacroM MeireiStructDef := do
+  match stx with
+  | `(imp_struct_def| struct $name:ident { $fields,* }) => do
+    let fields' ← fields.getElems.toList.mapM parseFieldDef
+    return { name := name.getId, fields := fields' }
+  | _ => Macro.throwError s!"Invalid struct definition syntax: {stx}"
+
+/-- Parse an enum definition -/
+def parseEnumDef (stx : TSyntax `imp_enum_def) : MacroM MeireiEnumDef := do
+  match stx with
+  | `(imp_enum_def| enum $name:ident { $ctors,* }) => do
+    let ctors' ← ctors.getElems.toList.mapM parseEnumCtor
+    return { name := name.getId, ctors := ctors' }
+  | _ => Macro.throwError s!"Invalid enum definition syntax: {stx}"
 
 end Meirei.Parser

@@ -18,11 +18,11 @@ def range (n : Int) : List Nat :=
 
 /-- Iterative Fibonacci using Meirei with pair accumulator pattern -/
 def fib := [Meirei|
-  def fib(n: int): int {
-    var a: int = 0;
-    var b: int = 1;
+  def fib(n: Int): Int {
+    var a: Int = 0;
+    var b: Int = 1;
     for i in range(n) {
-      var temp: int = b;
+      var temp: Int = b;
       b = a + b;
       a = temp;
     }

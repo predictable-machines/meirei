@@ -35,6 +35,12 @@ partial def detectControlFlow (stmt : MeireiStmt) : ControlFlowType :=
     else detectControlFlowInList elseStmts
   | MeireiStmt.block stmts => detectControlFlowInList stmts
   | MeireiStmt.forLoop _ _ stmts => detectControlFlowInList stmts
+  | MeireiStmt.whileLoop _ stmts _ => detectControlFlowInList stmts
+  | MeireiStmt.match_ _ arms =>
+    arms.foldl (fun acc (_, body) =>
+      if acc != ControlFlowType.none then acc
+      else detectControlFlowInList body
+    ) ControlFlowType.none
   | _ => ControlFlowType.none
 
 /-- Detect control flow type in a list of statements -/
@@ -56,6 +62,8 @@ partial def detectEffectfulOps (stmt : MeireiStmt) : Bool :=
     thenStmts.any detectEffectfulOps || elseStmts.any detectEffectfulOps
   | MeireiStmt.block stmts => stmts.any detectEffectfulOps
   | MeireiStmt.forLoop _ _ stmts => stmts.any detectEffectfulOps
+  | MeireiStmt.whileLoop _ stmts _ => stmts.any detectEffectfulOps
+  | MeireiStmt.match_ _ arms => arms.any (fun (_, body) => body.any detectEffectfulOps)
   | _ => false
 
 /-- Detect effectful operations in a list of statements -/
@@ -73,6 +81,9 @@ partial def collectDeclaredVars (stmt : MeireiStmt) : List Name :=
     collectDeclaredVarsInList thenStmts ++ collectDeclaredVarsInList elseStmts
   | MeireiStmt.block stmts => collectDeclaredVarsInList stmts
   | MeireiStmt.forLoop loopVar _ stmts => loopVar :: collectDeclaredVarsInList stmts
+  | MeireiStmt.whileLoop _ stmts _ => collectDeclaredVarsInList stmts
+  | MeireiStmt.match_ _ arms =>
+    arms.foldl (fun acc (_, body) => acc ++ collectDeclaredVarsInList body) []
   | _ => []
 
 /-- Collect all variables declared in a list of statements -/
@@ -92,6 +103,9 @@ partial def collectAssignedVars (stmt : MeireiStmt) : List Name :=
     collectAssignedVarsInList thenStmts ++ collectAssignedVarsInList elseStmts
   | MeireiStmt.block stmts => collectAssignedVarsInList stmts
   | MeireiStmt.forLoop _ _ stmts => collectAssignedVarsInList stmts
+  | MeireiStmt.whileLoop _ stmts _ => collectAssignedVarsInList stmts
+  | MeireiStmt.match_ _ arms =>
+    arms.foldl (fun acc (_, body) => acc ++ collectAssignedVarsInList body) []
   | _ => []
 
 /-- Collect all variables assigned in a list of statements -/
@@ -114,8 +128,10 @@ partial def collectExprVars (expr : MeireiExpr) : List Name :=
   match expr with
   | MeireiExpr.var name => [name]
   | MeireiExpr.intLit _ => []
+  | MeireiExpr.stringLit _ => []
   | MeireiExpr.binOp _ lhs rhs => collectExprVars lhs ++ collectExprVars rhs
   | MeireiExpr.call _ args => collectExprVarsInList args
+  | MeireiExpr.fieldAccess obj _ => collectExprVars obj
 
 /-- Collect all variables referenced in a list of expressions -/
 partial def collectExprVarsInList (exprs : List MeireiExpr) : List Name :=

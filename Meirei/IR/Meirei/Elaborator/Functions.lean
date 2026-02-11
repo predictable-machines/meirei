@@ -23,7 +23,7 @@ open Meirei.AST
 
 /-- Elaborate a function definition from AST -/
 def elabFunDef (funDef : MeireiFunDef) : ElabM Term := do
-  let _retTyTerm ← elabType funDef.returnType
+  let retTyTerm ← elabType funDef.returnType
 
   let mut paramBinders : Array (TSyntax `Lean.Parser.Term.funBinder) := #[]
   for param in funDef.params do
@@ -35,7 +35,17 @@ def elabFunDef (funDef : MeireiFunDef) : ElabM Term := do
 
   let bodyTerm ← elabStmtList funDef.body
 
-  let mut result := bodyTerm
+  -- For pure functions, annotate the body with the declared return type to catch
+  -- type errors early. For effectful functions (using `<-` binds), the body is
+  -- monadic (e.g. `EffectM ε α`) which doesn't match the declared return type
+  -- (`α`), so we omit the annotation and let Lean infer the monadic type.
+  let ctx ← get
+  let annotatedBody ←
+    if ctx.hasEffectfulOps then
+      pure bodyTerm
+    else
+      `(($bodyTerm : $retTyTerm))
+  let mut result : Term := annotatedBody
   for binder in paramBinders.reverse do
     result ← `(fun $binder => $result)
 

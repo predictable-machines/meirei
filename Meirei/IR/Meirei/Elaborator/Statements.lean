@@ -18,6 +18,7 @@ import PredictableVerification.IR.Meirei.Elaborator.Context
 import PredictableVerification.IR.Meirei.Elaborator.Expressions
 import PredictableVerification.IR.Meirei.Elaborator.Tuples
 import PredictableVerification.IR.Meirei.Elaborator.LoopHelpers
+import PredictableVerification.IR.Meirei.Elaborator.Types
 
 open Lean Lean.Elab Lean.Meta
 
@@ -48,6 +49,22 @@ def wrapSome (t : Term) : MacroM Term := do
 /-- Wrap a term in Option.none -/
 def wrapNone : MacroM Term := do
   `(none)
+
+-- =============================================================================
+-- Branch Assignment Helpers (for var propagation through if/else)
+-- =============================================================================
+
+/-- Extract (varName, rhsExpr) pairs from top-level assignments in a statement list -/
+private def extractAssignments (stmts : List MeireiStmt) : List (Name × MeireiExpr) :=
+  stmts.filterMap fun s => match s with
+  | MeireiStmt.assign name rhs => some (name, rhs)
+  | _ => none
+
+/-- Check if all statements are simple assignments -/
+private def allAssignments (stmts : List MeireiStmt) : Bool :=
+  stmts.all fun s => match s with
+  | MeireiStmt.assign _ _ => true
+  | _ => false
 
 -- =============================================================================
 -- Mutual Recursion Block
@@ -206,7 +223,7 @@ partial def elabSimpleFold
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := MeireiType.int, currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
   set foldCtx
 
   -- Optimize simple patterns: single assignment or if-then-else with assignments
@@ -249,7 +266,7 @@ partial def elabEarlyReturnLoop
   -- Build fold context with early return flag set
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true, inEarlyReturnLoop := true }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := MeireiType.int, currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
   set foldCtx
 
   -- Elaborate loop body (returns will be wrapped in Option.some)
@@ -289,7 +306,7 @@ partial def elabBreakLoop
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true, inBreakLoop := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := MeireiType.int, currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
   set foldCtx
 
   -- Elaborate body with break handling
@@ -328,7 +345,7 @@ partial def elabMixedReturnLoop
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := MeireiType.int, currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
   set foldCtx
 
   -- Special handling for mixed return + accumulation pattern
@@ -406,7 +423,7 @@ partial def elabEffectfulLoop
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true, hasEffectfulOps := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := MeireiType.int, currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
   set foldCtx
 
   let bodyExpr ← elabEffectfulFoldBody body varName
@@ -446,7 +463,7 @@ partial def elabTupleFold
   foldCtx := { foldCtx with inLoop := true }
   for (varName, varInfo) in modifiedVars do
     foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := MeireiType.int, currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
   set foldCtx
 
   -- Elaborate all statements in loop body
@@ -487,6 +504,31 @@ partial def elabTupleFold
   let foldExpr ← `(List.foldl (fun $statePatternTuple $loopVarIdent => $resultTuple) $initTuple $collTerm)
 
   return { term := updatedVars[0]!, patternBinding := some (updatedVars, foldExpr) }
+
+/-- Build a Lean match alternative: | pattern => body -/
+partial def mkMatchAlt (scrutineeTerm : Term) (ctorName : Name) (bindings : List Name) (bodyTerm : Term) (fallback : Term) : ElabM Term := do
+  let ctorIdent := mkIdent ctorName
+  if bindings.isEmpty then
+    `(match ($scrutineeTerm) with
+      | $ctorIdent => $bodyTerm
+      | _ => $fallback)
+  else
+    let patArgs := bindings.toArray.map (fun n => (⟨mkIdent n⟩ : Term))
+    let ctorPat : Term := Syntax.mkApp ⟨ctorIdent⟩ patArgs
+    `(match ($scrutineeTerm) with
+      | $ctorPat => $bodyTerm
+      | _ => $fallback)
+
+/-- Elaborate a match statement by building nested match terms -/
+partial def elabMatchStmt (scrutinee : MeireiExpr) (arms : List (MeireiPattern × List MeireiStmt)) : ElabM StmtResult := do
+  let scrutineeTerm ← elabExpr scrutinee
+  let mut result : Term ← `(default)
+  for (pat, body) in arms.reverse do
+    match pat with
+    | MeireiPattern.ctor ctorName bindings =>
+      let bodyTerm ← elabStmtList body
+      result ← mkMatchAlt scrutineeTerm ctorName bindings bodyTerm result
+  return { term := result }
 
 /-- Elaborate a single statement -/
 partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
@@ -559,7 +601,7 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
     let hasEffects := detectEffectfulOpsInList body
 
     -- Add loop variable and elaborate body to discover modified variables
-    let _ ← addVar loopVarName MeireiType.int
+    let _ ← addVar loopVarName (MeireiType.named `Int)
     let _ ← elabStmtList body
     let postLoopCtx ← get
 
@@ -608,6 +650,211 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
     else
       elabTupleFold loopVarName coll body modifiedVars savedCtx
 
+  -- While loop: while (cond) { stmts } or while (cond) decreasing(expr) { stmts }
+  -- Without decreasing: elaborated to inline let rec; user must use partial def.
+  -- With decreasing: emits termination_by so Lean can verify termination.
+  | MeireiStmt.whileLoop cond body decreasingExpr => do
+    let savedCtx ← get
+
+    -- Dry-run: elaborate body to discover modified variables
+    let _ ← elabStmtList body
+    let postLoopCtx ← get
+
+    let mut modifiedVars : Array (Name × VarInfo) := #[]
+    for (name, preInfo) in savedCtx.vars.toList do
+      match postLoopCtx.vars[name]? with
+      | some postInfo =>
+        if postInfo.currentVersion > preInfo.currentVersion then
+          modifiedVars := modifiedVars.push (name, preInfo)
+      | none => pure ()
+
+    set savedCtx
+
+    if modifiedVars.isEmpty then
+      Macro.throwError "while loop body does not modify any variables; loop would have no effect"
+
+    else if modifiedVars.size == 1 then
+      -- Single variable: let rec loop (v : T) : T := if cond then loop body else v
+      let (varName, varInfo) := modifiedVars[0]!
+      let currentVar := mkIdent (varName.appendAfter s!"_{varInfo.currentVersion}")
+      let varIdent := mkIdent (varName.appendAfter "_0")
+
+      let mut whileCtx := savedCtx
+      whileCtx := { whileCtx with inLoop := true }
+      whileCtx := { whileCtx with vars := whileCtx.vars.insert varName { varInfo with currentVersion := 0 } }
+      set whileCtx
+
+      validateConditionVars cond
+      let condTerm ← elabExpr cond
+
+      -- Re-elaborate body for single-var optimization
+      let bodyExpr ← if body.length == 1 then
+        match body[0]! with
+        | MeireiStmt.assign _ rhs => elabExpr rhs
+        | MeireiStmt.ifThenElse ifCond thenStmts elseStmts =>
+          if thenStmts.length == 1 && elseStmts.length == 1 then
+            match thenStmts[0]!, elseStmts[0]! with
+            | MeireiStmt.assign _ thenRhs, MeireiStmt.assign _ elseRhs => do
+              let ifCondTerm ← elabExpr ifCond
+              let thenVal ← elabExpr thenRhs
+              let elseVal ← elabExpr elseRhs
+              `(if $ifCondTerm then $thenVal else $elseVal)
+            | _, _ => elabStmtList body
+          else
+            elabStmtList body
+        | _ => elabStmtList body
+      else
+        elabStmtList body
+
+      -- Elaborate decreasing expression in loop context (vars at version 0)
+      let measureOpt ← match decreasingExpr with
+        | some decrExpr => do
+          let decrTerm ← elabExpr decrExpr
+          let toNatId := mkIdent ``Int.toNat
+          let m ← `($toNatId $decrTerm)
+          pure (some m)
+        | none => pure none
+
+      set savedCtx
+      let updatedVar ← updateVar varName
+
+      let varType ← elabType varInfo.type
+      let whileStx ← match measureOpt with
+        | some measure => do
+          -- Explicit parameter style with termination_by so Lean can
+          -- verify termination and generate equational lemmas.
+          let bodyWithRecCall ← `(if $condTerm then loop ($bodyExpr) else $varIdent)
+          `(let rec loop ($varIdent : $varType) : $varType := $bodyWithRecCall
+            termination_by $measure
+            loop $currentVar)
+        | none => do
+          -- Lambda style without termination_by (user must use partial def)
+          let loopBody ← `(fun ($varIdent : $varType) =>
+            if $condTerm then loop ($bodyExpr) else $varIdent)
+          let fnType ← `($varType → $varType)
+          let callExpr ← `(loop $currentVar)
+          `(let rec loop : $fnType := $loopBody; $callExpr)
+      -- Replace hygienic 'loop' with unhygienic mkIdent so the aux def
+      -- is accessible as parentDef.loop via #print
+      let unhygienicLoop := (mkIdent `loop).raw
+      let whileExpr : Term := ⟨whileStx.raw.rewriteBottomUp fun s =>
+        if s.isIdent && s.getId.eraseMacroScopes == `loop then unhygienicLoop else s⟩
+      return { term := updatedVar, binding := some (updatedVar, whileExpr) }
+
+    else
+      -- Multiple variables: let rec loop := fun (a, b) => if cond then loop body else (a, b)
+      let mut initTerms : Array Term := #[]
+      for (varName, varInfo) in modifiedVars do
+        let varIdent := mkIdent (varName.appendAfter s!"_{varInfo.currentVersion}")
+        initTerms := initTerms.push varIdent
+
+      let mut statePattern : Array Ident := #[]
+      for (varName, _) in modifiedVars do
+        let varIdent := mkIdent (varName.appendAfter "_0")
+        statePattern := statePattern.push varIdent
+
+      let mut whileCtx := savedCtx
+      whileCtx := { whileCtx with inLoop := true }
+      for (varName, varInfo) in modifiedVars do
+        whileCtx := { whileCtx with vars := whileCtx.vars.insert varName { varInfo with currentVersion := 0 } }
+      set whileCtx
+
+      validateConditionVars cond
+      let condTerm ← elabExpr cond
+
+      -- Elaborate decreasing expression at version 0 (before body bumps versions)
+      let measureOpt ← match decreasingExpr with
+        | some decrExpr => do
+          if modifiedVars.size > 2 then
+            Macro.throwError "decreasing annotation with more than 2 modified variables is not yet supported"
+          let decrTerm ← elabExpr decrExpr
+          let toNatId := mkIdent ``Int.toNat
+          let m ← `($toNatId $decrTerm)
+          pure (some m)
+        | none => pure none
+
+      -- Elaborate all statements in loop body
+      let mut stmtResults : Array StmtResult := #[]
+      for stmt in body do
+        let result ← elabStmt stmt
+        stmtResults := stmtResults.push result
+
+      -- Build result tuple of final variable values
+      let mut resultTerms : Array Term := #[]
+      for (varName, _) in modifiedVars do
+        let finalVar ← getVar varName
+        resultTerms := resultTerms.push finalVar
+
+      let resultTupleVars ← buildTupleFromTerms resultTerms
+
+      -- Build recursive call: individual args for termination_by, tuple for partial
+      let loopCall ← match measureOpt with
+        | some _ => do
+          let mut call : Term := ⟨mkIdent `loop⟩
+          for resultTerm in resultTerms do
+            call ← `($call $resultTerm)
+          pure call
+        | none => `(loop ($resultTupleVars))
+
+      let mut resultBody := loopCall
+      for i in [:stmtResults.size] do
+        let idx := stmtResults.size - 1 - i
+        let stmtResult := stmtResults[idx]!
+        match stmtResult.binding with
+        | some (varId, val) =>
+          resultBody ← `(let $varId := $val
+            $resultBody)
+        | none => pure ()
+
+      -- Build else branch: return state unchanged
+      let stateReturnTerms : Array Term := statePattern.map fun id => (id : Term)
+      let stateReturn ← buildTupleFromTerms stateReturnTerms
+
+      set savedCtx
+      let mut updatedVars : Array Ident := #[]
+      for (varName, _) in modifiedVars do
+        let updated ← updateVar varName
+        updatedVars := updatedVars.push updated
+
+      -- Build tuple type for annotation
+      let mut typeTerms : Array Term := #[]
+      for (_, varInfo) in modifiedVars do
+        let tyTerm ← elabType varInfo.type
+        typeTerms := typeTerms.push tyTerm
+      let tupleType ← if typeTerms.size == 2 then
+        `($(typeTerms[0]!) × $(typeTerms[1]!))
+      else
+        pure typeTerms[0]!
+
+      let whileStx ← match measureOpt with
+        | some measure => do
+          -- Individual parameters with termination_by (2 vars)
+          let v1 := statePattern[0]!
+          let v2 := statePattern[1]!
+          let t1 := typeTerms[0]!
+          let t2 := typeTerms[1]!
+          let bodyExpr ← `(if $condTerm then $resultBody else $stateReturn)
+          let init1 := initTerms[0]!
+          let init2 := initTerms[1]!
+          `(let rec loop ($v1 : $t1) ($v2 : $t2) : $tupleType := $bodyExpr
+            termination_by $measure
+            loop $init1 $init2)
+        | none => do
+          -- Lambda style without termination_by (user must use partial def)
+          let statePatternTuple ← buildPatternTuple statePattern
+          let initTuple ← buildTupleFromTerms initTerms
+          let fnType ← `($tupleType → $tupleType)
+          let loopFn ← `(fun $statePatternTuple =>
+            if $condTerm then $resultBody else $stateReturn)
+          let callExpr ← `(loop $initTuple)
+          `(let rec loop : $fnType := $loopFn; $callExpr)
+
+      let unhygienicLoop := (mkIdent `loop).raw
+      let whileExpr : Term := ⟨whileStx.raw.rewriteBottomUp fun s =>
+        if s.isIdent && s.getId.eraseMacroScopes == `loop then unhygienicLoop else s⟩
+
+      return { term := updatedVars[0]!, patternBinding := some (updatedVars, whileExpr) }
+
   -- If-then-else statement: if (cond) { thenStmts } else { elseStmts }
   | MeireiStmt.ifThenElse cond thenStmts elseStmts => do
     let ctx ← get
@@ -623,26 +870,82 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
       let term ← `(if $condTerm then $thenTerm else $elseTerm)
       return { term, controlFlow := finalCf }
     else
-      let thenTerm ← elabStmtList thenStmts
-      let elseTerm ← elabStmtList elseStmts
-      let term ← `(if $condTerm then $thenTerm else $elseTerm)
-      return { term, controlFlow := finalCf }
+      -- Detect var modification: branches with only assignments to existing vars.
+      -- Produces `let s_1 := if cond then rhs_a else rhs_b` so mutations propagate.
+      let thenAssigns := extractAssignments thenStmts
+      let elseAssigns := extractAssignments elseStmts
+      let allAssigns := thenAssigns ++ elseAssigns
+      let mut modifiedVarNames : Array Name := #[]
+      for (name, _) in allAssigns do
+        if !modifiedVarNames.contains name && ctx.vars.contains name then
+          modifiedVarNames := modifiedVarNames.push name
+
+      if modifiedVarNames.size == 1
+         && finalCf == ControlFlowType.none
+         && !ctx.inLoop
+         && (allAssignments thenStmts || thenStmts.isEmpty)
+         && (allAssignments elseStmts || elseStmts.isEmpty) then
+        let varName := modifiedVarNames[0]!
+        let thenRhs := thenAssigns.find? (fun a => a.1 == varName) |>.map (·.2)
+        let elseRhs := elseAssigns.find? (fun a => a.1 == varName) |>.map (·.2)
+        let currentVarTerm ← elabExpr (MeireiExpr.var varName)
+        let thenVal ← match thenRhs with
+          | some rhs => elabExpr rhs
+          | none => pure currentVarTerm
+        let elseVal ← match elseRhs with
+          | some rhs => elabExpr rhs
+          | none => pure currentVarTerm
+        let newVar ← updateVar varName
+        let ifExpr ← `(if $condTerm then $thenVal else $elseVal)
+        return { term := newVar, binding := some (newVar, ifExpr), controlFlow := finalCf }
+      else
+        let thenTerm ← elabStmtList thenStmts
+        let elseTerm ← elabStmtList elseStmts
+        let term ← `(if $condTerm then $thenTerm else $elseTerm)
+        return { term, controlFlow := finalCf }
 
   -- If-then statement: if (cond) { stmts }
   | MeireiStmt.ifThen cond stmts => do
-    let condTerm ← elabExpr cond
-    let bodyTerm ← elabStmtList stmts
     let ctx ← get
-    -- Generate appropriate else branch based on context
-    let elseTerm ← if ctx.inEarlyReturnLoop then
-      wrapNone  -- In early-return loops, else branch returns none
-    else if ctx.inBreakLoop then
-      `(())  -- In break loops, else branch continues
-    else
-      `(())  -- Default: empty else branch
-    let term ← `(if $condTerm then $bodyTerm else $elseTerm)
+    let condTerm ← elabExpr cond
     let cf := detectControlFlowInList stmts
-    return { term, controlFlow := cf }
+
+    -- Detect var modification in if-then (no else) outside loops.
+    -- Produces `let s_1 := if cond then rhs else s_0`.
+    let assigns := extractAssignments stmts
+    let mut modifiedVarNames : Array Name := #[]
+    for (name, _) in assigns do
+      if !modifiedVarNames.contains name && ctx.vars.contains name then
+        modifiedVarNames := modifiedVarNames.push name
+
+    if modifiedVarNames.size == 1
+       && cf == ControlFlowType.none
+       && !ctx.inLoop
+       && allAssignments stmts then
+      let varName := modifiedVarNames[0]!
+      match assigns.find? (fun a => a.1 == varName) with
+      | some (_, rhs) =>
+        let currentVarTerm ← elabExpr (MeireiExpr.var varName)
+        let thenVal ← elabExpr rhs
+        let newVar ← updateVar varName
+        let ifExpr ← `(if $condTerm then $thenVal else $currentVarTerm)
+        return { term := newVar, binding := some (newVar, ifExpr), controlFlow := cf }
+      | none =>
+        let bodyTerm ← elabStmtList stmts
+        let elseTerm ← if ctx.inEarlyReturnLoop then wrapNone
+          else `(())
+        let term ← `(if $condTerm then $bodyTerm else $elseTerm)
+        return { term, controlFlow := cf }
+    else
+      let bodyTerm ← elabStmtList stmts
+      let elseTerm ← if ctx.inEarlyReturnLoop then
+        wrapNone
+      else if ctx.inBreakLoop then
+        `(())
+      else
+        `(())
+      let term ← `(if $condTerm then $bodyTerm else $elseTerm)
+      return { term, controlFlow := cf }
 
   -- Block statement: { stmts }
   | MeireiStmt.block stmts => do
@@ -676,6 +979,10 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
     set { ctx with hasEffectfulOps := true }
     let varIdent := mkIdent bindVar
     return { term := varIdent, binding := some (varIdent, callExpr), isEffectfulBinding := true }
+
+  -- Match statement: match expr { case Ctor(x, y) { ... } ... }
+  | MeireiStmt.match_ scrutinee arms => do
+    elabMatchStmt scrutinee arms
 
 /-- Elaborate a sequence of statements -/
 partial def elabStmtList (stmts : List MeireiStmt) : ElabM Term := do
@@ -718,18 +1025,21 @@ partial def elabStmtList (stmts : List MeireiStmt) : ElabM Term := do
           -- Pattern binding (tuple destructuring)
           match stmtResult.patternBinding with
           | some (identArray, val) =>
-            -- Destructure tuple into individual let bindings
+            -- Bind value once to a temp, then destructure (avoids duplicating let rec)
+            let tmpIdent := mkIdent `_tupleResult
             for _h : i in [:identArray.size] do
               let idx := identArray.size - 1 - i
               let ident := identArray[idx]!
               if idx == 0 then
-                result ← `(let $ident := $val.1
+                result ← `(let $ident := $tmpIdent.1
                   $result)
               else if idx == 1 then
-                result ← `(let $ident := $val.2
+                result ← `(let $ident := $tmpIdent.2
                   $result)
               else
                 Macro.throwError "Tuples with more than 2 elements not yet supported"
+            result ← `(let $tmpIdent := $val
+              $result)
           | none => pure ()
 
     return result

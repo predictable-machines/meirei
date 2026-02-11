@@ -10,10 +10,10 @@ import PredictableVerification.IR.Meirei.Elaborator.Index
 open Meirei
 
 -- Example 1: intSum - Pure function
--- Input:  def intSum(x: int, y: int): int { return x + y; }
+-- Input:  def intSum(x: Int, y: Int): Int { return x + y; }
 -- Output: fun (x : Int) (y : Int) => x + y
 def intSum := [Meirei|
-  def intSum(x: int, y: int): int {
+  def intSum(x: Int, y: Int): Int {
     return x + y;
   }
 ]
@@ -25,11 +25,11 @@ def intSum := [Meirei|
 #eval intSum 10 (-3)  -- 7
 
 -- Example 2: mySum - Function with loop converted to fold
--- Input:  def mySum(l: [int]): int { var out: int = 0; for i in l { out = intSum(out, i); } return out; }
+-- Input:  def mySum(l: [Int]): Int { var out: Int = 0; for i in l { out = intSum(out, i); } return out; }
 -- Output: fun (l : List Int) => List.foldl (fun out i => intSum out i) 0 l
 def mySum := [Meirei|
-  def mySum(l: [int]): int {
-    var out: int = 0;
+  def mySum(l: [Int]): Int {
+    var out: Int = 0;
     for i in l {
       out = intSum(out, i);
     }
@@ -46,7 +46,7 @@ def mySum := [Meirei|
 
 -- Example 3: multiply - Another pure function
 def multiply := [Meirei|
-  def multiply(a: int, b: int): int {
+  def multiply(a: Int, b: Int): Int {
     return a * b;
   }
 ]
@@ -57,7 +57,7 @@ def multiply := [Meirei|
 
 -- Example 4: increment - Single parameter function
 def increment := [Meirei|
-  def increment(n: int): int {
+  def increment(n: Int): Int {
     return n + 1;
   }
 ]
@@ -68,8 +68,8 @@ def increment := [Meirei|
 
 -- Example 5: productSum - Using multiply with a loop
 def productSum := [Meirei|
-  def productSum(nums: [int]): int {
-    var total: int = 0;
+  def productSum(nums: [Int]): Int {
+    var total: Int = 0;
     for n in nums {
       total = multiply(total, n);
     }

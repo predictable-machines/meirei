@@ -75,7 +75,7 @@ axiom computeOffset_nonneg (n : Int) (h : n ≥ 0) : computeOffset n ⊧ (· ≥
 -- A function that gets an offset from an effectful call, computes the index, then accesses the array
 -- This demonstrates chaining effectful operations with computed indices
 noncomputable def getAndAdd := [Meirei|
-  def getAndAdd(arr: [int], start: int, base: int) : int {
+  def getAndAdd(arr: [Int], start: Int, base: Int) : Int {
     offset <- computeOffset(start);
     elem <- arrayGet(arr, start + offset);
     return base + elem;

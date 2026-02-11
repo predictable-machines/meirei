@@ -22,7 +22,7 @@ open Meirei
 -/
 
 def findFirstEvenAbove := [Meirei|
-  def findFirstEvenAbove(nums: [int]): int {
+  def findFirstEvenAbove(nums: [Int]): Int {
     for x in nums {
       if (x > 5) {
         if (x > 10) {
@@ -53,8 +53,8 @@ def findFirstEvenAbove := [Meirei|
 -/
 
 def sumUntilNegativeOrLarge := [Meirei|
-  def sumUntilNegativeOrLarge(nums: [int]): int {
-    var total: int = 0;
+  def sumUntilNegativeOrLarge(nums: [Int]): Int {
+    var total: Int = 0;
     for x in nums {
       if (x < 0) {
         break;
@@ -88,8 +88,8 @@ def sumUntilNegativeOrLarge := [Meirei|
 -/
 
 def maxBeforeSentinel := [Meirei|
-  def maxBeforeSentinel(nums: [int]): int {
-    var max: int = 0;
+  def maxBeforeSentinel(nums: [Int]): Int {
+    var max: Int = 0;
     for x in nums {
       if (x == -999) {
         break;
@@ -121,8 +121,8 @@ def maxBeforeSentinel := [Meirei|
 -/
 
 def countPositiveOrError := [Meirei|
-  def countPositiveOrError(nums: [int]): int {
-    var count: int = 0;
+  def countPositiveOrError(nums: [Int]): Int {
+    var count: Int = 0;
     for x in nums {
       if (x > 50) {
         return -1;
@@ -154,8 +154,8 @@ def countPositiveOrError := [Meirei|
 -/
 
 def productUntilZero := [Meirei|
-  def productUntilZero(nums: [int]): int {
-    var product: int = 1;
+  def productUntilZero(nums: [Int]): Int {
+    var product: Int = 1;
     for x in nums {
       if (x == 0) {
         break;
@@ -185,7 +185,7 @@ def productUntilZero := [Meirei|
 -/
 
 def findFirstDivisor := [Meirei|
-  def findFirstDivisor(nums: [int]): int {
+  def findFirstDivisor(nums: [Int]): Int {
     for d in nums {
       if (d > 2) {
         if (d < 20) {
@@ -216,8 +216,8 @@ def findFirstDivisor := [Meirei|
 -/
 
 def sumPositivesOnly := [Meirei|
-  def sumPositivesOnly(nums: [int]): int {
-    var total: int = 0;
+  def sumPositivesOnly(nums: [Int]): Int {
+    var total: Int = 0;
     for x in nums {
       if (x > 0) {
         total = total + x;

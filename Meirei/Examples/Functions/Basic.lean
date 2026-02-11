@@ -11,7 +11,7 @@ open Meirei
 
 -- Example 1: intSum function using term-level syntax
 def intSum_example := [Meirei|
-  def intSum(x: int, y: int): int {
+  def intSum(x: Int, y: Int): Int {
     return x + y;
   }
 ]
@@ -21,8 +21,8 @@ def intSum_example := [Meirei|
 
 -- Example 2: mySum function using term-level syntax
 def mySum_example := [Meirei|
-  def mySum(l: [int]): int {
-    var out: int = 0;
+  def mySum(l: [Int]): Int {
+    var out: Int = 0;
     for i in l {
       out = intSum_example(out, i);
     }

@@ -2,7 +2,7 @@
   Elaborator Core - Main Entry Point
 
   This module provides the main entry point for the Meirei elaborator
-  and registers the macro for [Meirei| ... ] syntax.
+  and registers the term elaborator for [Meirei| ... ] syntax.
 -/
 
 import Lean
@@ -10,6 +10,8 @@ import PredictableVerification.IR.Meirei.Syntax
 import PredictableVerification.IR.Meirei.Parser
 import PredictableVerification.IR.Meirei.Elaborator.Context
 import PredictableVerification.IR.Meirei.Elaborator.Functions
+import PredictableVerification.IR.Meirei.Elaborator.TypeDecls
+import PredictableVerification.IR.Meirei.Elaborator.EnvExtension
 
 open Lean Lean.Elab Lean.Meta
 
@@ -29,11 +31,29 @@ def elabMeirei (stx : TSyntax `imp_fundef) : MacroM Term := do
 end Meirei.Elaborator
 
 -- =============================================================================
--- Macro Registration
+-- Elaborator Registration
 -- =============================================================================
 
-open Meirei.Elaborator
+open Meirei.Elaborator Meirei.Parser Meirei
 
-/-- Register the elaborator for [Meirei| ... ] syntax -/
-macro_rules
-  | `([Meirei| $fundef:imp_fundef ]) => elabMeirei fundef
+/-- Term elaborator for [Meirei| ... ]. Uses elab instead of macro_rules so we
+    can pretty-print the generated syntax and store it for #meirei_print. -/
+elab "[Meirei|" fundef:imp_fundef "]" : term => do
+  let termStx ← liftMacroM (elabMeirei fundef)
+  -- imp_fundef syntax: "def" ident "(" params ")" ":" type "{" stmts "}"
+  let funcName := fundef.raw[1]!.getId
+  let fmt ← Lean.PrettyPrinter.ppTerm termStx
+  modifyEnv fun env => meireiCodeExt.addEntry env (funcName, toString fmt)
+  Term.elabTerm termStx none
+
+/-- Elaborate meirei_type struct to Lean structure -/
+elab_rules : command
+  | `(command| meirei_type $sd:imp_struct_def) => do
+    let ast ← Elab.liftMacroM <| parseStructDef sd
+    elabStructDef ast
+
+/-- Elaborate meirei_type enum to Lean inductive -/
+elab_rules : command
+  | `(command| meirei_type $ed:imp_enum_def) => do
+    let ast ← Elab.liftMacroM <| parseEnumDef ed
+    elabEnumDef ast
