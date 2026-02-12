@@ -48,7 +48,7 @@ def findFirstGreaterThan10 := [Meirei|
 ]
 
 #check findFirstGreaterThan10  -- findFirstGreaterThan10 : List Int → Int
-
+#print findFirstGreaterThan10
 -- Test cases
 #eval findFirstGreaterThan10 [1, 5, 3, 15, 20]  -- Should be 15 (first > 10)
 #eval findFirstGreaterThan10 [1, 2, 3]          -- Should be 0 (none > 10)
