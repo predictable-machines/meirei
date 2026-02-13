@@ -12,6 +12,7 @@ namespace Meirei
 declare_syntax_cat imp_type
 syntax "[" imp_type "]" : imp_type  -- List sugar: [T] → List T
 syntax ident : imp_type             -- Named types (Int, String, Point, etc.)
+syntax ident "(" imp_type,* ")" : imp_type  -- Multi-arg type: Except(String, Int)
 syntax imp_type "?" : imp_type      -- Option sugar: T? → Option T
 
 -- Expression syntax
@@ -20,13 +21,28 @@ syntax ident : imp_expr                                    -- Variables
 syntax num : imp_expr                                      -- Numbers
 syntax "-" num : imp_expr                                  -- Negative numbers
 syntax:max str : imp_expr                                  -- String literals
-syntax imp_expr "+" imp_expr : imp_expr                    -- Addition
-syntax imp_expr "-" imp_expr : imp_expr                    -- Subtraction
-syntax imp_expr "*" imp_expr : imp_expr                    -- Multiplication
-syntax imp_expr "/" imp_expr : imp_expr                    -- Division
-syntax imp_expr ">" imp_expr : imp_expr                    -- Greater than
-syntax imp_expr "<" imp_expr : imp_expr                    -- Less than
-syntax imp_expr "==" imp_expr : imp_expr                   -- Equality
+-- Precedence levels follow standard conventions (matching Lean's infixl pattern):
+--   Left operand gets :p, right operand gets :(p+1) for left-associativity.
+--   75: unary prefix (!)
+--   70: multiplicative (*, /, %)
+--   65: additive (+, -)
+--   50: comparison (>, <, >=, <=, ==, !=)
+--   35: logical AND (&&)
+--   30: logical OR (||)
+syntax:75 "!" imp_expr:75 : imp_expr                                   -- Logical NOT
+syntax:70 imp_expr:70 "*" imp_expr:71 : imp_expr                      -- Multiplication
+syntax:70 imp_expr:70 "/" imp_expr:71 : imp_expr                      -- Division
+syntax:70 imp_expr:70 "%" imp_expr:71 : imp_expr                      -- Modulo
+syntax:65 imp_expr:65 "+" imp_expr:66 : imp_expr                      -- Addition
+syntax:65 imp_expr:65 "-" imp_expr:66 : imp_expr                      -- Subtraction
+syntax:50 imp_expr:50 ">" imp_expr:51 : imp_expr                      -- Greater than
+syntax:50 imp_expr:50 "<" imp_expr:51 : imp_expr                      -- Less than
+syntax:50 imp_expr:50 ">=" imp_expr:51 : imp_expr                     -- Greater than or equal
+syntax:50 imp_expr:50 "<=" imp_expr:51 : imp_expr                     -- Less than or equal
+syntax:50 imp_expr:50 "==" imp_expr:51 : imp_expr                     -- Equality
+syntax:50 imp_expr:50 "!=" imp_expr:51 : imp_expr                     -- Not equal
+syntax:35 imp_expr:35 "&&" imp_expr:36 : imp_expr                     -- Logical AND
+syntax:30 imp_expr:30 "||" imp_expr:31 : imp_expr                     -- Logical OR
 -- Function call argument: string literals can't appear directly in imp_expr,*
 -- due to a Lean parser first-set limitation, so we use a wrapper category.
 declare_syntax_cat imp_arg
@@ -48,6 +64,7 @@ syntax "if" "(" imp_expr ")" "{" imp_stmt* "}" : imp_stmt  -- If statement
 syntax "if" "(" imp_expr ")" "{" imp_stmt* "}" "else" "{" imp_stmt* "}" : imp_stmt  -- If-else statement
 syntax "while" "(" imp_expr ")" ("decreasing" "(" imp_expr ")")? "{" imp_stmt* "}" : imp_stmt -- While loop
 syntax "break" ";" : imp_stmt                              -- Break from loop
+syntax "throw" imp_expr ";" : imp_stmt                     -- Throw expression (in Except-returning functions)
 syntax "{" imp_stmt* "}" : imp_stmt                        -- Block
 
 -- Match arm syntax (declared before use in imp_stmt)

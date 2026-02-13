@@ -37,6 +37,8 @@ structure ElabContext where
   pendingOptionExtraction : Option (Ident × Term) := none  -- (resultIdent, defaultValue) for Option extraction
   pendingMixedReturn : Option (Ident × Ident) := none  -- (optionIdent, accumIdent) for mixed return + accumulation
   hasEffectfulOps : Bool := false  -- Has this function seen any effectful operations?
+  inExceptFunction : Bool := false  -- Is the current function returning Except(E, T)?
+  exceptErrorType : Option MeireiType := none  -- The error type E when in an Except function
   deriving Inhabited
 
 /-- Elaboration monad -/

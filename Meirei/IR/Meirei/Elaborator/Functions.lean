@@ -7,6 +7,7 @@
 
 import Lean
 import PredictableVerification.IR.Meirei.AST
+import PredictableVerification.IR.Meirei.Analysis
 import PredictableVerification.IR.Meirei.Elaborator.Context
 import PredictableVerification.IR.Meirei.Elaborator.Types
 import PredictableVerification.IR.Meirei.Elaborator.Statements
@@ -24,6 +25,13 @@ open Meirei.AST
 /-- Elaborate a function definition from AST -/
 def elabFunDef (funDef : MeireiFunDef) : ElabM Term := do
   let retTyTerm ← elabType funDef.returnType
+
+  -- Detect Except(E, T) return type and set context flags
+  match Analysis.isExceptReturnType funDef.returnType with
+  | some (errTy, _) =>
+    let ctx ← get
+    set { ctx with inExceptFunction := true, exceptErrorType := some errTy }
+  | none => pure ()
 
   let mut paramBinders : Array (TSyntax `Lean.Parser.Term.funBinder) := #[]
   for param in funDef.params do

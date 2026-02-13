@@ -24,17 +24,30 @@ inductive BinOp where
   | sub  -- -
   | mul  -- *
   | div  -- /
+  | mod  -- %
   | gt   -- >
   | lt   -- <
+  | ge   -- >=
+  | le   -- <=
   | eq   -- ==
+  | ne   -- !=
+  | and_ -- &&
+  | or_  -- ||
+  deriving Repr, BEq, Inhabited
+
+/-- Unary operators -/
+inductive UnaryOp where
+  | not_ -- !
   deriving Repr, BEq, Inhabited
 
 /-- Meirei expression representation -/
 inductive MeireiExpr where
   | var : Lean.Name → MeireiExpr
   | intLit : Int → MeireiExpr
+  | boolLit : Bool → MeireiExpr
   | stringLit : String → MeireiExpr
   | binOp : BinOp → MeireiExpr → MeireiExpr → MeireiExpr
+  | unaryOp : UnaryOp → MeireiExpr → MeireiExpr
   | call : Lean.Name → List MeireiExpr → MeireiExpr
   | fieldAccess : MeireiExpr → Lean.Name → MeireiExpr
   deriving Repr, Inhabited
@@ -50,6 +63,7 @@ inductive MeireiStmt where
   | assign : Lean.Name → MeireiExpr → MeireiStmt
   | ret : MeireiExpr → MeireiStmt
   | break_ : MeireiStmt
+  | throw_ : MeireiExpr → MeireiStmt
   | forLoop : Lean.Name → MeireiExpr → List MeireiStmt → MeireiStmt
   | ifThen : MeireiExpr → List MeireiStmt → MeireiStmt
   | ifThenElse : MeireiExpr → List MeireiStmt → List MeireiStmt → MeireiStmt

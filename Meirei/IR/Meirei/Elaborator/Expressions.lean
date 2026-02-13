@@ -31,6 +31,9 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
       let lit := Lean.Syntax.mkNumLit (toString (-n))
       `(- $lit)
 
+  | MeireiExpr.boolLit b =>
+    if b then `(true) else `(false)
+
   | MeireiExpr.stringLit s =>
     return Lean.Syntax.mkStrLit s
 
@@ -53,9 +56,20 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
     | BinOp.sub => `($lhs' - $rhs')
     | BinOp.mul => `($lhs' * $rhs')
     | BinOp.div => `($lhs' / $rhs')
-    | BinOp.gt => `($lhs' > $rhs')
-    | BinOp.lt => `($lhs' < $rhs')
-    | BinOp.eq => `($lhs' == $rhs')
+    | BinOp.mod => `($lhs' % $rhs')
+    | BinOp.gt  => `($lhs' > $rhs')
+    | BinOp.lt  => `($lhs' < $rhs')
+    | BinOp.ge  => `($lhs' >= $rhs')
+    | BinOp.le  => `($lhs' <= $rhs')
+    | BinOp.eq  => `($lhs' == $rhs')
+    | BinOp.ne  => `($lhs' != $rhs')
+    | BinOp.and_ => `($lhs' && $rhs')
+    | BinOp.or_  => `($lhs' || $rhs')
+
+  | MeireiExpr.unaryOp op operand => do
+    let operand' ← elabExpr operand
+    match op with
+    | UnaryOp.not_ => `(!$operand')
 
   | MeireiExpr.call name args => do
     let args' ← args.mapM elabExpr
@@ -85,12 +99,14 @@ partial def validateConditionVars (expr : MeireiExpr) : ElabM Unit := do
   | MeireiExpr.binOp _ lhs rhs =>
     validateConditionVars lhs
     validateConditionVars rhs
+  | MeireiExpr.unaryOp _ operand =>
+    validateConditionVars operand
   | MeireiExpr.call _ args =>
     for arg in args do
       validateConditionVars arg
   | MeireiExpr.fieldAccess obj _ =>
     validateConditionVars obj
-  | MeireiExpr.intLit _ | MeireiExpr.stringLit _ => pure ()
+  | MeireiExpr.intLit _ | MeireiExpr.boolLit _ | MeireiExpr.stringLit _ => pure ()
 
 -- =============================================================================
 -- Expression Substitution (for Loop State Access)
@@ -112,15 +128,27 @@ partial def substituteVarInExpr (expr : MeireiExpr) (varName : Name) (replacemen
     | BinOp.sub => `($lhs' - $rhs')
     | BinOp.mul => `($lhs' * $rhs')
     | BinOp.div => `($lhs' / $rhs')
-    | BinOp.gt => `($lhs' > $rhs')
-    | BinOp.lt => `($lhs' < $rhs')
-    | BinOp.eq => `($lhs' == $rhs')
+    | BinOp.mod => `($lhs' % $rhs')
+    | BinOp.gt  => `($lhs' > $rhs')
+    | BinOp.lt  => `($lhs' < $rhs')
+    | BinOp.ge  => `($lhs' >= $rhs')
+    | BinOp.le  => `($lhs' <= $rhs')
+    | BinOp.eq  => `($lhs' == $rhs')
+    | BinOp.ne  => `($lhs' != $rhs')
+    | BinOp.and_ => `($lhs' && $rhs')
+    | BinOp.or_  => `($lhs' || $rhs')
+  | MeireiExpr.unaryOp op operand => do
+    let operand' ← substituteVarInExpr operand varName replacement
+    match op with
+    | UnaryOp.not_ => `(!$operand')
   | MeireiExpr.intLit n =>
     if n >= 0 then
       return Lean.Syntax.mkNumLit (toString n)
     else
       let lit := Lean.Syntax.mkNumLit (toString (-n))
       `(- $lit)
+  | MeireiExpr.boolLit b =>
+    if b then `(true) else `(false)
   | MeireiExpr.stringLit s =>
     return Lean.Syntax.mkStrLit s
   | MeireiExpr.call name args => do

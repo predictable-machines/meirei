@@ -27,6 +27,7 @@ mutual
 partial def detectControlFlow (stmt : MeireiStmt) : ControlFlowType :=
   match stmt with
   | MeireiStmt.ret _ => ControlFlowType.hasReturn
+  | MeireiStmt.throw_ _ => ControlFlowType.hasReturn
   | MeireiStmt.break_ => ControlFlowType.hasBreak
   | MeireiStmt.ifThen _ stmts => detectControlFlowInList stmts
   | MeireiStmt.ifThenElse _ thenStmts elseStmts =>
@@ -69,6 +70,22 @@ partial def detectEffectfulOps (stmt : MeireiStmt) : Bool :=
 /-- Detect effectful operations in a list of statements -/
 def detectEffectfulOpsInList (stmts : List MeireiStmt) : Bool :=
   stmts.any detectEffectfulOps
+
+/-- Detect if a statement contains throw operations -/
+partial def detectThrowOps (stmt : MeireiStmt) : Bool :=
+  match stmt with
+  | MeireiStmt.throw_ _ => true
+  | MeireiStmt.ifThen _ stmts => stmts.any detectThrowOps
+  | MeireiStmt.ifThenElse _ t e => t.any detectThrowOps || e.any detectThrowOps
+  | MeireiStmt.block stmts => stmts.any detectThrowOps
+  | MeireiStmt.forLoop _ _ stmts => stmts.any detectThrowOps
+  | MeireiStmt.whileLoop _ stmts _ => stmts.any detectThrowOps
+  | MeireiStmt.match_ _ arms => arms.any (fun (_, body) => body.any detectThrowOps)
+  | _ => false
+
+/-- Detect throw operations in a list of statements -/
+def detectThrowOpsInList (stmts : List MeireiStmt) : Bool :=
+  stmts.any detectThrowOps
 
 mutual
 
@@ -128,8 +145,10 @@ partial def collectExprVars (expr : MeireiExpr) : List Name :=
   match expr with
   | MeireiExpr.var name => [name]
   | MeireiExpr.intLit _ => []
+  | MeireiExpr.boolLit _ => []
   | MeireiExpr.stringLit _ => []
   | MeireiExpr.binOp _ lhs rhs => collectExprVars lhs ++ collectExprVars rhs
+  | MeireiExpr.unaryOp _ operand => collectExprVars operand
   | MeireiExpr.call _ args => collectExprVarsInList args
   | MeireiExpr.fieldAccess obj _ => collectExprVars obj
 
@@ -138,5 +157,12 @@ partial def collectExprVarsInList (exprs : List MeireiExpr) : List Name :=
   exprs.foldl (fun acc expr => acc ++ collectExprVars expr) []
 
 end
+
+/-- Check if a type is Except(E, T), returning (E, T) if so -/
+def isExceptReturnType (ty : MeireiType) : Option (MeireiType × MeireiType) :=
+  match ty with
+  | MeireiType.app (MeireiType.app (MeireiType.named name) errTy) valTy =>
+    if name == `Except then some (errTy, valTy) else none
+  | _ => none
 
 end Meirei.Analysis

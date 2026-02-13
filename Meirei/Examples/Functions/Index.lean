@@ -12,3 +12,6 @@ import PredictableVerification.Examples.Functions.StringLiterals
 import PredictableVerification.Examples.Functions.Mutability
 import PredictableVerification.Examples.Functions.WhileLoops
 import PredictableVerification.Examples.Functions.WorkingComplexExamples
+import PredictableVerification.Examples.Functions.ComparisonAndLogic
+import PredictableVerification.Examples.Functions.ExceptAndThrow
+import PredictableVerification.Examples.Functions.OperatorPrecedence

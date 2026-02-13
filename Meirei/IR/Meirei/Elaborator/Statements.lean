@@ -40,6 +40,10 @@ structure StmtResult where
   isEffectfulBinding : Bool := false  -- Is this binding effectful (use ← instead of :=)?
   patternBinding : Option (Array Ident × Term) := none  -- Optional (identifiers, value) for tuple destructuring
   controlFlow : ControlFlowType := ControlFlowType.none  -- Control flow type in this statement
+  -- For if-then early return guards: (condition, returnValue).
+  -- elabStmtList uses this to nest the continuation in the else branch,
+  -- transforming `if (c) { return v; } rest` into `if c then v else rest`.
+  earlyReturn : Option (Term × Term) := none
   deriving Inhabited
 
 /-- Wrap a term in Option.some -/
@@ -226,10 +230,22 @@ partial def elabSimpleFold
   foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
   set foldCtx
 
-  -- Optimize simple patterns: single assignment or if-then-else with assignments
+  -- Optimize simple patterns: single assignment, if-then with assignment,
+  -- or if-then-else with assignments in both branches
   let bodyExpr ← if body.length == 1 then
     match body[0]! with
     | MeireiStmt.assign _ rhs => elabExpr rhs
+    | MeireiStmt.ifThen cond thenStmts =>
+      -- `if (cond) { acc = expr; }` → `if cond then expr else acc`
+      if thenStmts.length == 1 then
+        match thenStmts[0]! with
+        | MeireiStmt.assign _ thenRhs => do
+          let condTerm ← elabExpr cond
+          let thenVal ← elabExpr thenRhs
+          `(if $condTerm then $thenVal else $varIdent)
+        | _ => elabStmtList body
+      else
+        elabStmtList body
     | MeireiStmt.ifThenElse cond thenStmts elseStmts =>
       if thenStmts.length == 1 && elseStmts.length == 1 then
         match thenStmts[0]!, elseStmts[0]! with
@@ -530,6 +546,202 @@ partial def elabMatchStmt (scrutinee : MeireiExpr) (arms : List (MeireiPattern �
       result ← mkMatchAlt scrutineeTerm ctorName bindings bodyTerm result
   return { term := result }
 
+/-- Elaborate the body of an Except fold, producing an Except-wrapped result.
+    Recursively processes the statement list: throw guards become
+    `if cond then Except.error ... else <rest>`, varDecls become let bindings,
+    and the final accumulator assignment becomes `Except.ok value`. -/
+partial def elabExceptFoldBody (body : List MeireiStmt) (varName : Name) (varIdent : Ident) : ElabM Term := do
+  match body with
+  | [] => `(Except.ok $varIdent)
+  | [stmt] =>
+    match stmt with
+    | MeireiStmt.assign _ rhs => do
+      let rhsTerm ← elabExpr rhs
+      `(Except.ok $rhsTerm)
+    | MeireiStmt.ifThen cond guardBody =>
+      if guardBody.length == 1 then
+        match guardBody[0]! with
+        | MeireiStmt.throw_ throwExpr => do
+          let condTerm ← elabExpr cond
+          let throwTerm ← elabExpr throwExpr
+          `(if $condTerm then Except.error $throwTerm else Except.ok $varIdent)
+        | _ => do
+          let bodyTerm ← elabStmtList body
+          `(Except.ok $bodyTerm)
+      else do
+        let bodyTerm ← elabStmtList body
+        `(Except.ok $bodyTerm)
+    | _ => do
+      let bodyTerm ← elabStmtList body
+      `(Except.ok $bodyTerm)
+  | stmt :: rest =>
+    match stmt with
+    | MeireiStmt.ifThen cond guardBody =>
+      if guardBody.length == 1 then
+        match guardBody[0]! with
+        | MeireiStmt.throw_ throwExpr => do
+          let condTerm ← elabExpr cond
+          let throwTerm ← elabExpr throwExpr
+          let restTerm ← elabExceptFoldBody rest varName varIdent
+          `(if $condTerm then Except.error $throwTerm else $restTerm)
+        | _ => do
+          let bodyTerm ← elabStmtList body
+          `(Except.ok $bodyTerm)
+      else do
+        let bodyTerm ← elabStmtList body
+        `(Except.ok $bodyTerm)
+    | MeireiStmt.varDecl name ty init => do
+      let initTerm ← elabExpr init
+      let varId ← addVar name ty
+      let restTerm ← elabExceptFoldBody rest varName varIdent
+      `(let $varId := $initTerm; $restTerm)
+    | _ => do
+      let bodyTerm ← elabStmtList body
+      `(Except.ok $bodyTerm)
+
+/-- Elaborate an Except fold loop (pure Except + throw + single modified var).
+    Accumulator is Except E AccType. After the fold, switches to effectful mode
+    so subsequent bindings use >>= (which propagates Except.error). -/
+partial def elabExceptFold
+    (loopVarName : Name)
+    (coll : MeireiExpr)
+    (body : List MeireiStmt)
+    (varName : Name)
+    (varInfo : VarInfo)
+    (savedCtx : ElabContext)
+    : ElabM StmtResult := do
+  let currentVar := mkIdent (varName.appendAfter s!"_{varInfo.currentVersion}")
+  let collTerm ← elabExpr coll
+
+  let varIdent := mkIdent (varName.appendAfter "_0")
+  let loopVarIdent := mkIdent (loopVarName.appendAfter "_0")
+  let accIdent := mkIdent `acc_0
+
+  -- Build fold context with loop variable at version 0
+  let mut foldCtx := savedCtx
+  foldCtx := { foldCtx with inLoop := true }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
+  set foldCtx
+
+  let bodyExpr ← elabExceptFoldBody body varName varIdent
+
+  -- Restore context and switch to effectful mode so continuation uses >>=
+  -- (Except E is a monad; >>= propagates errors, pure = Except.ok)
+  set { savedCtx with hasEffectfulOps := true, inExceptFunction := true }
+  let updatedVar ← updateVar varName
+
+  -- Fold: short-circuit on error, extract ok value for body
+  -- Build match separately to avoid parse ambiguity in quotation
+  let matchBody ← `(match ($accIdent) with
+    | Except.error e => Except.error e
+    | Except.ok $varIdent => $bodyExpr)
+  let foldExpr ← `(List.foldl (fun $accIdent $loopVarIdent => $matchBody) (Except.ok $currentVar) $collTerm)
+
+  return { term := updatedVar, binding := some (updatedVar, foldExpr), isEffectfulBinding := true }
+
+/-- Elaborate the body of an Except tuple fold, producing an Except-wrapped tuple.
+    Like `elabExceptFoldBody` but for multiple modified variables.
+    Throw guards become `if cond then Except.error ... else <rest>`,
+    varDecls become let bindings, assignments update variable versions,
+    and the final result is `Except.ok (v1, v2, ...)`. -/
+partial def elabExceptTupleFoldBody (body : List MeireiStmt) (modifiedVarNames : Array Name) : ElabM Term := do
+  let mkOkTuple : ElabM Term := do
+    let mut terms : Array Term := #[]
+    for varName in modifiedVarNames do
+      let varId ← getVar varName
+      terms := terms.push varId
+    let tuple ← buildTupleFromTerms terms
+    `(Except.ok $tuple)
+  match body with
+  | [] => mkOkTuple
+  | stmt :: rest =>
+    match stmt with
+    | MeireiStmt.ifThen cond guardBody =>
+      if guardBody.length == 1 then
+        match guardBody[0]! with
+        | MeireiStmt.throw_ throwExpr => do
+          let condTerm ← elabExpr cond
+          let throwTerm ← elabExpr throwExpr
+          let restTerm ← elabExceptTupleFoldBody rest modifiedVarNames
+          `(if $condTerm then Except.error $throwTerm else $restTerm)
+        | _ => do
+          let bodyTerm ← elabStmtList body
+          `(Except.ok $bodyTerm)
+      else do
+        let bodyTerm ← elabStmtList body
+        `(Except.ok $bodyTerm)
+    | MeireiStmt.varDecl name ty init => do
+      let initTerm ← elabExpr init
+      let varId ← addVar name ty
+      let restTerm ← elabExceptTupleFoldBody rest modifiedVarNames
+      `(let $varId := $initTerm; $restTerm)
+    | MeireiStmt.assign name rhs => do
+      let rhsTerm ← elabExpr rhs
+      let newVarId ← updateVar name
+      let restTerm ← elabExceptTupleFoldBody rest modifiedVarNames
+      `(let $newVarId := $rhsTerm; $restTerm)
+    | _ => do
+      let bodyTerm ← elabStmtList body
+      `(Except.ok $bodyTerm)
+
+/-- Elaborate an Except tuple fold loop (pure Except + throw + multiple modified vars).
+    Accumulator is Except E (T1 × T2 × ...). After the fold, switches to effectful
+    mode so subsequent bindings use >>= (which propagates Except.error). -/
+partial def elabExceptTupleFold
+    (loopVarName : Name)
+    (coll : MeireiExpr)
+    (body : List MeireiStmt)
+    (modifiedVars : Array (Name × VarInfo))
+    (savedCtx : ElabContext)
+    : ElabM StmtResult := do
+  -- Build initial values for each modified var
+  let mut initTerms : Array Term := #[]
+  for (varName, varInfo) in modifiedVars do
+    initTerms := initTerms.push (mkIdent (varName.appendAfter s!"_{varInfo.currentVersion}"))
+
+  let collTerm ← elabExpr coll
+
+  -- Build pattern for destructuring the Except.ok tuple in the fold body
+  let mut statePattern : Array Ident := #[]
+  for (varName, _) in modifiedVars do
+    statePattern := statePattern.push (mkIdent (varName.appendAfter "_0"))
+  let statePatternTuple ← buildPatternTuple statePattern
+
+  -- Build fold context with all modified variables at version 0
+  let mut foldCtx := savedCtx
+  foldCtx := { foldCtx with inLoop := true }
+  for (varName, varInfo) in modifiedVars do
+    foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 } }
+  set foldCtx
+
+  let modifiedVarNames := modifiedVars.map (·.1)
+  let bodyExpr ← elabExceptTupleFoldBody body modifiedVarNames
+
+  -- Restore context and switch to effectful mode so continuation uses >>=
+  -- (Except E is a monad; >>= propagates errors, pure = Except.ok)
+  set { savedCtx with hasEffectfulOps := true, inExceptFunction := true }
+
+  let accIdent := mkIdent `acc_0
+  let loopVarIdent := mkIdent (loopVarName.appendAfter "_0")
+  let initTuple ← buildTupleFromTerms initTerms
+
+  -- Fold: short-circuit on error, destructure ok tuple for body
+  let matchBody ← `(match ($accIdent) with
+    | Except.error e => Except.error e
+    | Except.ok $statePatternTuple => $bodyExpr)
+  let foldExpr ← `(List.foldl (fun $accIdent $loopVarIdent => $matchBody) (Except.ok $initTuple) $collTerm)
+
+  -- Update all variable versions for post-loop continuation
+  let mut updatedVars : Array Ident := #[]
+  for (varName, _) in modifiedVars do
+    let updated ← updateVar varName
+    updatedVars := updatedVars.push updated
+
+  -- Effectful pattern binding: >>= extracts the Except.ok value, then destructure tuple
+  return { term := updatedVars[0]!, patternBinding := some (updatedVars, foldExpr), isEffectfulBinding := true }
+
 /-- Elaborate a single statement -/
 partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
   match stmt with
@@ -569,6 +781,10 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
       -- Generate: Option.getD resultIdent eTerm
       let extractedTerm ← `(Option.getD $resultIdent $eTerm)
       return { term := extractedTerm, isReturn := true, controlFlow := ControlFlowType.hasReturn }
+    else if ctx.inExceptFunction && !ctx.hasEffectfulOps then
+      -- Pure Except return: wrap in Except.ok
+      let okTerm ← `(Except.ok $eTerm)
+      return { term := okTerm, isReturn := true, controlFlow := ControlFlowType.hasReturn }
     else
       -- Check if we're in an effectful context
       if ctx.hasEffectfulOps then
@@ -591,6 +807,21 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
     else
       let term ← `(())
       return { term, controlFlow := ControlFlowType.hasBreak }
+
+  -- Throw statement: throw expr;
+  -- In pure Except context, generates `Except.error expr`
+  -- In effectful context, generates monadic `throw expr`
+  | MeireiStmt.throw_ expr => do
+    let eTerm ← elabExpr expr
+    let ctx ← get
+    if !ctx.inExceptFunction && !ctx.hasEffectfulOps then
+      Macro.throwError "throw used outside Except-returning or effectful function"
+    if ctx.hasEffectfulOps then
+      let throwTerm ← `(throw $eTerm)
+      return { term := throwTerm, isReturn := true, controlFlow := ControlFlowType.hasReturn }
+    else
+      let errorTerm ← `(Except.error $eTerm)
+      return { term := errorTerm, isReturn := true, controlFlow := ControlFlowType.hasReturn }
 
   -- For loop: for x in collection { stmts }
   | MeireiStmt.forLoop loopVarName coll body => do
@@ -616,6 +847,17 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
 
     -- Restore context
     set savedCtx
+
+    -- Except fold: pure Except function with throw in loop body
+    -- Uses Except E AccType as accumulator; short-circuits on error
+    let hasThrow := detectThrowOpsInList body
+    if hasThrow && savedCtx.inExceptFunction && !hasEffects && modifiedVars.size == 1 then
+      return ← elabExceptFold loopVarName coll body modifiedVars[0]!.1 modifiedVars[0]!.2 savedCtx
+
+    -- Except tuple fold: pure Except function with throw + multiple modified vars
+    -- Same strategy as Except fold but accumulates into a tuple
+    if hasThrow && savedCtx.inExceptFunction && !hasEffects && modifiedVars.size > 1 then
+      return ← elabExceptTupleFold loopVarName coll body modifiedVars savedCtx
 
     -- Mixed pattern: early return + variable accumulation
     -- Use accumulator type (Option ReturnValue, AccumulatorValue)
@@ -691,6 +933,16 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
       let bodyExpr ← if body.length == 1 then
         match body[0]! with
         | MeireiStmt.assign _ rhs => elabExpr rhs
+        | MeireiStmt.ifThen ifCond thenStmts =>
+          if thenStmts.length == 1 then
+            match thenStmts[0]! with
+            | MeireiStmt.assign _ thenRhs => do
+              let ifCondTerm ← elabExpr ifCond
+              let thenVal ← elabExpr thenRhs
+              `(if $ifCondTerm then $thenVal else $varIdent)
+            | _ => elabStmtList body
+          else
+            elabStmtList body
         | MeireiStmt.ifThenElse ifCond thenStmts elseStmts =>
           if thenStmts.length == 1 && elseStmts.length == 1 then
             match thenStmts[0]!, elseStmts[0]! with
@@ -938,14 +1190,26 @@ partial def elabStmt (stmt : MeireiStmt) : ElabM StmtResult := do
         return { term, controlFlow := cf }
     else
       let bodyTerm ← elabStmtList stmts
-      let elseTerm ← if ctx.inEarlyReturnLoop then
-        wrapNone
-      else if ctx.inBreakLoop then
-        `(())
+      -- Detect complete early return guards: if the body's last statement is
+      -- a return, every path through the body returns when the condition holds.
+      -- Emit earlyReturn so elabStmtList can nest the continuation as the else branch.
+      let lastIsEarlyExit := match stmts.getLast? with
+        | some (MeireiStmt.ret _) => true
+        | some (MeireiStmt.throw_ _) => true
+        | _ => false
+      if cf == ControlFlowType.hasReturn && lastIsEarlyExit
+         && !ctx.inEarlyReturnLoop && !ctx.inBreakLoop then
+        let term ← `(if $condTerm then $bodyTerm else ())
+        return { term, controlFlow := cf, earlyReturn := some (condTerm, bodyTerm) }
       else
-        `(())
-      let term ← `(if $condTerm then $bodyTerm else $elseTerm)
-      return { term, controlFlow := cf }
+        let elseTerm ← if ctx.inEarlyReturnLoop then
+          wrapNone
+        else if ctx.inBreakLoop then
+          `(())
+        else
+          `(())
+        let term ← `(if $condTerm then $bodyTerm else $elseTerm)
+        return { term, controlFlow := cf }
 
   -- Block statement: { stmts }
   | MeireiStmt.block stmts => do
@@ -1007,6 +1271,12 @@ partial def elabStmtList (stmts : List MeireiStmt) : ElabM Term := do
     for i in [:lastIdx] do
       let idx := lastIdx - 1 - i
       let stmtResult := results[idx]!
+      -- Early return guard: nest continuation as the else branch
+      -- e.g. `if (x <= lo) { return lo; } rest` → `if x <= lo then lo else rest`
+      match stmtResult.earlyReturn with
+      | some (cond, retVal) =>
+        result ← `(if $cond then $retVal else $result)
+      | none =>
       -- If this statement returns, it becomes the result
       if stmtResult.isReturn then
         result := stmtResult.term
@@ -1038,8 +1308,11 @@ partial def elabStmtList (stmts : List MeireiStmt) : ElabM Term := do
                   $result)
               else
                 Macro.throwError "Tuples with more than 2 elements not yet supported"
-            result ← `(let $tmpIdent := $val
-              $result)
+            if stmtResult.isEffectfulBinding then
+              result ← `($val >>= fun $tmpIdent => $result)
+            else
+              result ← `(let $tmpIdent := $val
+                $result)
           | none => pure ()
 
     return result

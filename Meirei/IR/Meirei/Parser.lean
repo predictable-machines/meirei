@@ -20,7 +20,7 @@ open Meirei.AST
     Type names must start with an uppercase letter. -/
 private def resolveTypeName (name : String) : MacroM MeireiType := do
   let numQuestions := name.toList.reverse.takeWhile (· == '?') |>.length
-  let baseName := name.dropRight numQuestions
+  let baseName := (name.dropEnd numQuestions).toString
   match baseName.toList.head? with
   | some c =>
     if !c.isUpper then
@@ -42,6 +42,19 @@ partial def parseType (stx : TSyntax `imp_type) : MacroM MeireiType := do
   | `(imp_type| $ty:imp_type ?) => do
     let inner ← parseType ty
     return MeireiType.app (MeireiType.named `Option) inner
+  | `(imp_type| $n:ident ( $args,* )) => do
+    let argsList := args.getElems.toList
+    if argsList.isEmpty then
+      Macro.throwError "Type application requires at least one argument"
+    let baseName := n.getId.toString
+    match baseName.toList.head? with
+    | some c => if !c.isUpper then Macro.throwError s!"Type names must start with uppercase, got '{baseName}'"
+    | none => Macro.throwError "Empty type name"
+    let mut result := MeireiType.named (Name.mkSimple baseName)
+    for arg in argsList do
+      let argTy ← parseType arg
+      result := MeireiType.app result argTy
+    return result
   | `(imp_type| $n:ident) => resolveTypeName n.getId.toString
   | _ => Macro.throwError s!"Unsupported type syntax: {stx}"
 
@@ -79,7 +92,10 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     return MeireiExpr.intLit (- n.getNat)
 
   | `(imp_expr| $x:ident) =>
-    return MeireiExpr.var x.getId
+    let name := x.getId
+    if name == `true then return MeireiExpr.boolLit true
+    else if name == `false then return MeireiExpr.boolLit false
+    else return MeireiExpr.var name
 
   | `(imp_expr| $a:imp_expr + $b:imp_expr) => do
     let a' ← parseExpr a
@@ -101,6 +117,11 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     let b' ← parseExpr b
     return MeireiExpr.binOp BinOp.div a' b'
 
+  | `(imp_expr| $a:imp_expr % $b:imp_expr) => do
+    let a' ← parseExpr a
+    let b' ← parseExpr b
+    return MeireiExpr.binOp BinOp.mod a' b'
+
   | `(imp_expr| $a:imp_expr > $b:imp_expr) => do
     let a' ← parseExpr a
     let b' ← parseExpr b
@@ -111,10 +132,39 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     let b' ← parseExpr b
     return MeireiExpr.binOp BinOp.lt a' b'
 
+  | `(imp_expr| $a:imp_expr >= $b:imp_expr) => do
+    let a' ← parseExpr a
+    let b' ← parseExpr b
+    return MeireiExpr.binOp BinOp.ge a' b'
+
+  | `(imp_expr| $a:imp_expr <= $b:imp_expr) => do
+    let a' ← parseExpr a
+    let b' ← parseExpr b
+    return MeireiExpr.binOp BinOp.le a' b'
+
   | `(imp_expr| $a:imp_expr == $b:imp_expr) => do
     let a' ← parseExpr a
     let b' ← parseExpr b
     return MeireiExpr.binOp BinOp.eq a' b'
+
+  | `(imp_expr| $a:imp_expr != $b:imp_expr) => do
+    let a' ← parseExpr a
+    let b' ← parseExpr b
+    return MeireiExpr.binOp BinOp.ne a' b'
+
+  | `(imp_expr| $a:imp_expr && $b:imp_expr) => do
+    let a' ← parseExpr a
+    let b' ← parseExpr b
+    return MeireiExpr.binOp BinOp.and_ a' b'
+
+  | `(imp_expr| $a:imp_expr || $b:imp_expr) => do
+    let a' ← parseExpr a
+    let b' ← parseExpr b
+    return MeireiExpr.binOp BinOp.or_ a' b'
+
+  | `(imp_expr| ! $a:imp_expr) => do
+    let a' ← parseExpr a
+    return MeireiExpr.unaryOp UnaryOp.not_ a'
 
   | `(imp_expr| $f:ident ( $args,* )) => do
     let args' ← args.getElems.toList.mapM parseArg
@@ -161,6 +211,10 @@ partial def parseStmt (stx : TSyntax `imp_stmt) : MacroM MeireiStmt := do
 
   | `(imp_stmt| break ;) =>
     return MeireiStmt.break_
+
+  | `(imp_stmt| throw $e:imp_expr ;) => do
+    let e' ← parseExpr e
+    return MeireiStmt.throw_ e'
 
   | `(imp_stmt| for $x:ident in $coll:imp_expr { $stmts* }) => do
     let coll' ← parseExpr coll
