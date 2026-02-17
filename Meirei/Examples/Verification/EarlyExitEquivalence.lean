@@ -84,10 +84,10 @@ theorem findFirst_eq_findFirstPure_complete (l : List Int) :
 -- =============================================================================
 
 -- Test that both implementations work the same
-#eval findFirstGreaterThan10Pure [1, 5, 3, 15, 20]  -- 15
-#eval findFirstGreaterThan10Pure [1, 2, 3]          -- 0
-#eval findFirstGreaterThan10Pure [20, 30, 5]        -- 20
-#eval findFirstGreaterThan10Pure []                 -- 0
+#guard findFirstGreaterThan10Pure [1, 5, 3, 15, 20] == 15
+#guard findFirstGreaterThan10Pure [1, 2, 3] == 0
+#guard findFirstGreaterThan10Pure [20, 30, 5] == 20
+#guard findFirstGreaterThan10Pure [] == 0
 
 -- Verify the theorem with concrete examples
 example : findFirstGreaterThan10 [1, 5, 3, 15, 20] = findFirstGreaterThan10Pure [1, 5, 3, 15, 20] := by

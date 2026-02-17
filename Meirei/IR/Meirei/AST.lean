@@ -31,8 +31,9 @@ inductive BinOp where
   | le   -- <=
   | eq   -- ==
   | ne   -- !=
-  | and_ -- &&
-  | or_  -- ||
+  | and_    -- &&
+  | or_     -- ||
+  | append  -- ++ (string concatenation)
   deriving Repr, BEq, Inhabited
 
 /-- Unary operators -/

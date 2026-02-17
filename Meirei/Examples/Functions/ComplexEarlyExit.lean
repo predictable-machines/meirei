@@ -35,11 +35,11 @@ def findFirstEvenAbove := [Meirei|
 ]
 
 #check findFirstEvenAbove
-#eval findFirstEvenAbove [1, 2, 3, 11, 15]  -- Should be 11
-#eval findFirstEvenAbove [1, 2, 3, 4, 5]    -- Should be 0 (none > 10)
-#eval findFirstEvenAbove [6, 7, 8, 9]       -- Should be 0 (6,7,8,9 but none > 10)
-#eval findFirstEvenAbove [20, 1, 2]         -- Should be 20
-#eval findFirstEvenAbove []                 -- Should be 0
+#guard findFirstEvenAbove [1, 2, 3, 11, 15] == 11
+#guard findFirstEvenAbove [1, 2, 3, 4, 5] == 0
+#guard findFirstEvenAbove [6, 7, 8, 9] == 0
+#guard findFirstEvenAbove [20, 1, 2] == 20
+#guard findFirstEvenAbove [] == 0
 
 #print findFirstEvenAbove
 
@@ -70,11 +70,11 @@ def sumUntilNegativeOrLarge := [Meirei|
 ]
 
 #check sumUntilNegativeOrLarge
-#eval sumUntilNegativeOrLarge [1, 2, 3, 4, 5]      -- Should be 15
-#eval sumUntilNegativeOrLarge [10, 20, -5, 30]     -- Should be 30 (stops at -5)
-#eval sumUntilNegativeOrLarge [10, 20, 200, 30]    -- Should be 30 (stops at 200)
-#eval sumUntilNegativeOrLarge [-1, 2, 3]           -- Should be 0 (stops immediately)
-#eval sumUntilNegativeOrLarge []                   -- Should be 0
+#guard sumUntilNegativeOrLarge [1, 2, 3, 4, 5] == 15
+#guard sumUntilNegativeOrLarge [10, 20, -5, 30] == 30
+#guard sumUntilNegativeOrLarge [10, 20, 200, 30] == 30
+#guard sumUntilNegativeOrLarge [-1, 2, 3] == 0
+#guard sumUntilNegativeOrLarge [] == 0
 
 #print sumUntilNegativeOrLarge
 
@@ -103,11 +103,11 @@ def maxBeforeSentinel := [Meirei|
 ]
 
 #check maxBeforeSentinel
-#eval maxBeforeSentinel [5, 10, 3, 15, 2]       -- Should be 15
-#eval maxBeforeSentinel [5, 10, -999, 100]      -- Should be 10 (stops at -999)
-#eval maxBeforeSentinel [-999, 5, 10]           -- Should be 0 (stops immediately)
-#eval maxBeforeSentinel [1, 2, 3]               -- Should be 3
-#eval maxBeforeSentinel []                      -- Should be 0
+#guard maxBeforeSentinel [5, 10, 3, 15, 2] == 15
+#guard maxBeforeSentinel [5, 10, -999, 100] == 10  -- stops at -999
+#guard maxBeforeSentinel [-999, 5, 10] == 0        -- stops immediately
+#guard maxBeforeSentinel [1, 2, 3] == 3
+#guard maxBeforeSentinel [] == 0
 
 #print maxBeforeSentinel
 
@@ -136,11 +136,11 @@ def countPositiveOrError := [Meirei|
 ]
 
 #check countPositiveOrError
-#eval countPositiveOrError [1, 2, -5, 3, 4]     -- Should be 4
-#eval countPositiveOrError [1, 2, 60, 3]        -- Should be -1 (error on 60)
-#eval countPositiveOrError [-1, -2, -3]         -- Should be 0
-#eval countPositiveOrError [10, 20, 30]         -- Should be 3
-#eval countPositiveOrError []                   -- Should be 0
+#guard countPositiveOrError [1, 2, -5, 3, 4] == 4
+#guard countPositiveOrError [1, 2, 60, 3] == -1
+#guard countPositiveOrError [-1, -2, -3] == 0
+#guard countPositiveOrError [10, 20, 30] == 3
+#guard countPositiveOrError [] == 0
 
 #print countPositiveOrError
 
@@ -167,11 +167,11 @@ def productUntilZero := [Meirei|
 ]
 
 #check productUntilZero
-#eval productUntilZero [2, 3, 4]           -- Should be 24
-#eval productUntilZero [2, 3, 0, 5]        -- Should be 6 (stops at 0)
-#eval productUntilZero [0, 2, 3]           -- Should be 1 (stops immediately)
-#eval productUntilZero [5]                 -- Should be 5
-#eval productUntilZero []                  -- Should be 1
+#guard productUntilZero [2, 3, 4] == 24
+#guard productUntilZero [2, 3, 0, 5] == 6
+#guard productUntilZero [0, 2, 3] == 1
+#guard productUntilZero [5] == 5
+#guard productUntilZero [] == 1
 
 #print productUntilZero
 
@@ -198,11 +198,11 @@ def findFirstDivisor := [Meirei|
 ]
 
 #check findFirstDivisor
-#eval findFirstDivisor [1, 2, 3, 4, 5]      -- Should be 3 (first > 2)
-#eval findFirstDivisor [1, 2, 25, 3]        -- Should be 3 (25 > 20, so skip)
-#eval findFirstDivisor [1, 2]               -- Should be 0
-#eval findFirstDivisor [10, 15, 5]          -- Should be 10
-#eval findFirstDivisor []                   -- Should be 0
+#guard findFirstDivisor [1, 2, 3, 4, 5] == 3
+#guard findFirstDivisor [1, 2, 25, 3] == 3
+#guard findFirstDivisor [1, 2] == 0
+#guard findFirstDivisor [10, 15, 5] == 10
+#guard findFirstDivisor [] == 0
 
 #print findFirstDivisor
 
@@ -230,10 +230,10 @@ def sumPositivesOnly := [Meirei|
 ]
 
 #check sumPositivesOnly
-#eval sumPositivesOnly [1, -2, 3, -4, 5]    -- Should be 9 (1+3+5)
-#eval sumPositivesOnly [-1, -2, -3]         -- Should be 0
-#eval sumPositivesOnly [10, 20, 30]         -- Should be 60
-#eval sumPositivesOnly []                   -- Should be 0
+#guard sumPositivesOnly [1, -2, 3, -4, 5] == 9
+#guard sumPositivesOnly [-1, -2, -3] == 0
+#guard sumPositivesOnly [10, 20, 30] == 60
+#guard sumPositivesOnly [] == 0
 
 #print sumPositivesOnly
 

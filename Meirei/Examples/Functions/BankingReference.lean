@@ -41,9 +41,9 @@ def txTypeCode := [Meirei|
   }
 ]
 
-#eval txTypeCode TransactionType.Deposit     -- 1
-#eval txTypeCode TransactionType.Withdrawal  -- 2
-#eval txTypeCode TransactionType.Transfer    -- 3
+#guard txTypeCode TransactionType.Deposit == 1
+#guard txTypeCode TransactionType.Withdrawal == 2
+#guard txTypeCode TransactionType.Transfer == 3
 
 -- =============================================================================
 -- Account.java
@@ -53,9 +53,9 @@ def txTypeCode := [Meirei|
 meirei_type struct Account { id: String, balance: Int }
 
 #check Account
-#check Account.mk        -- String → Int → Account
-#check @Account.id       -- Account → String
-#check @Account.balance  -- Account → Int
+#check Account.mk
+#check @Account.id
+#check @Account.balance
 
 -- Java: public void deposit(int amount) { balance += amount; }
 -- Pure: returns new Account instead of mutating
@@ -65,8 +65,8 @@ def accountDeposit := [Meirei|
   }
 ]
 
-#check accountDeposit                           -- Account → Int → Account
-#eval accountDeposit (Account.mk "alice" 1000) 200  -- { id := "alice", balance := 1200 }
+#check accountDeposit
+#guard accountDeposit (Account.mk "alice" 1000) 200 == Account.mk "alice" 1200
 
 -- Java: public void withdraw(int amount) { ... balance -= amount; }
 -- Preconditions (amount > 0, balance >= amount) assumed — no exceptions in Meirei
@@ -76,8 +76,8 @@ def accountWithdraw := [Meirei|
   }
 ]
 
-#check accountWithdraw                          -- Account → Int → Account
-#eval accountWithdraw (Account.mk "bob" 500) 100    -- { id := "bob", balance := 400 }
+#check accountWithdraw
+#guard accountWithdraw (Account.mk "bob" 500) 100 == Account.mk "bob" 400
 
 -- Java: public int getBalance() { return balance; }
 def accountBalance := [Meirei|
@@ -86,7 +86,7 @@ def accountBalance := [Meirei|
   }
 ]
 
-#eval accountBalance (Account.mk "alice" 1000)  -- 1000
+#guard accountBalance (Account.mk "alice" 1000) == 1000
 
 -- Java: public String getId() { return id; }
 def accountId := [Meirei|
@@ -95,7 +95,7 @@ def accountId := [Meirei|
   }
 ]
 
-#eval accountId (Account.mk "alice" 1000)  -- "alice"
+#guard accountId (Account.mk "alice" 1000) == "alice"
 
 -- String literals used directly in Meirei function bodies
 def defaultAccount := [Meirei|
@@ -104,8 +104,8 @@ def defaultAccount := [Meirei|
   }
 ]
 
-#eval defaultAccount 0     -- { id := "default", balance := 0 }
-#eval defaultAccount 1000  -- { id := "default", balance := 1000 }
+#guard defaultAccount 0 == Account.mk "default" 0
+#guard defaultAccount 1000 == Account.mk "default" 1000
 
 -- String literals in various Meirei expression positions
 
@@ -116,7 +116,7 @@ def stringReturn := [Meirei|
   }
 ]
 
-#eval stringReturn  -- "hello"
+#guard stringReturn == "hello"
 
 -- In var initializer + assignment inside a loop
 def stringInAssign := [Meirei|
@@ -129,8 +129,8 @@ def stringInAssign := [Meirei|
   }
 ]
 
-#eval stringInAssign [1]  -- "updated"
-#eval stringInAssign []   -- "initial"
+#guard stringInAssign [1] == "updated"
+#guard stringInAssign [] == "initial"
 
 -- In binary comparison (if-else, not if-return which needs a loop)
 def stringInCondition := [Meirei|
@@ -143,8 +143,8 @@ def stringInCondition := [Meirei|
   }
 ]
 
-#eval stringInCondition "alice"  -- 1
-#eval stringInCondition "bob"    -- 0
+#guard stringInCondition "alice" == 1
+#guard stringInCondition "bob" == 0
 
 -- =============================================================================
 -- Transaction.java
@@ -160,7 +160,7 @@ meirei_type struct Transaction {
 }
 
 #check Transaction
-#check Transaction.mk  -- TransactionType → Option String → Option String → Int → Transaction
+#check Transaction.mk
 
 -- Java: new Transaction(TransactionType.DEPOSIT, null, accountId, amount)
 def makeDepositTx := [Meirei|
@@ -183,10 +183,6 @@ def makeTransferTx := [Meirei|
   }
 ]
 
-#eval makeDepositTx "alice" 200
-#eval makeWithdrawalTx "bob" 100
-#eval makeTransferTx "alice" "bob" 300
-
 -- Java: public int getAmount() { return amount; }
 def txAmount := [Meirei|
   def txAmount(tx: Transaction): Int {
@@ -194,7 +190,7 @@ def txAmount := [Meirei|
   }
 ]
 
-#eval txAmount (makeTransferTx "alice" "bob" 300)  -- 300
+#guard txAmount (makeTransferTx "alice" "bob" 300) == 300
 
 -- =============================================================================
 -- Bank.java (partial — stateful collection mutations cannot be expressed)
@@ -220,9 +216,9 @@ def findAccountBalance := [Meirei|
   }
 ]
 
-#eval findAccountBalance [Account.mk "alice" 1000, Account.mk "bob" 500] "alice"  -- 1000
-#eval findAccountBalance [Account.mk "alice" 1000, Account.mk "bob" 500] "bob"    -- 500
-#eval findAccountBalance [Account.mk "alice" 1000, Account.mk "bob" 500] "eve"    -- 0
+#guard findAccountBalance [Account.mk "alice" 1000, Account.mk "bob" 500] "alice" == 1000
+#guard findAccountBalance [Account.mk "alice" 1000, Account.mk "bob" 500] "bob" == 500
+#guard findAccountBalance [Account.mk "alice" 1000, Account.mk "bob" 500] "eve" == 0
 
 -- Compute total balance across all accounts.
 -- Parentheses around the function call are needed for parser precedence.
@@ -236,8 +232,8 @@ def totalBalance := [Meirei|
   }
 ]
 
-#eval totalBalance [Account.mk "alice" 1000, Account.mk "bob" 500]  -- 1500
-#eval totalBalance []                                      -- 0
+#guard totalBalance [Account.mk "alice" 1000, Account.mk "bob" 500] == 1500
+#guard totalBalance [] == 0
 
 -- Count entries in the transaction log
 def countTransactions := [Meirei|
@@ -280,19 +276,19 @@ def bobFinalBalance := [Meirei|
   }
 ]
 
--- Expected outputs from Java Main.main()
-#eval aliceFinalBalance 1000 200 300  -- 900
-#eval bobFinalBalance 500 100 300     -- 700
+#guard aliceFinalBalance 1000 200 300 == 900
+#guard bobFinalBalance 500 100 300 == 700
 
 -- End-to-end demo using the Account struct operations, mirroring Main.java
-#eval
+#guard (
   let alice := Account.mk "alice" 1000
   let bob := Account.mk "bob" 500
   let alice := accountDeposit alice 200
   let bob := accountWithdraw bob 100
-  let alice := accountWithdraw alice 300  -- transfer out
-  let bob := accountDeposit bob 300       -- transfer in
-  (alice.balance, bob.balance)            -- (900, 700)
+  let alice := accountWithdraw alice 300
+  let bob := accountDeposit bob 300
+  (alice.balance, bob.balance) == (900, 700)
+)
 
 end BankingReference
 

@@ -15,11 +15,11 @@ open Meirei
 
 meirei_type struct Point { x: Int, y: Int }
 
-#check Point           -- Type
-#check Point.mk        -- Int → Int → Point
-#check @Point.x        -- Point → Int
+#check Point
+#check Point.mk
+#check @Point.x
 
-#eval Point.mk 3 4     -- { x := 3, y := 4 }
+#guard Point.mk 3 4 == Point.mk 3 4
 
 -- =============================================================================
 -- Enum Definition (Sum Type)
@@ -27,12 +27,12 @@ meirei_type struct Point { x: Int, y: Int }
 
 meirei_type enum Shape { Circle(radius: Int), Rectangle(width: Int, height: Int) }
 
-#check Shape                -- Type
-#check Shape.Circle         -- Int → Shape
-#check Shape.Rectangle      -- Int → Int → Shape
+#check Shape
+#check Shape.Circle
+#check Shape.Rectangle
 
-#eval Shape.Circle 5              -- Shape.Circle 5
-#eval Shape.Rectangle 3 4         -- Shape.Rectangle 3 4
+#guard Shape.Circle 5 == Shape.Circle 5
+#guard Shape.Rectangle 3 4 == Shape.Rectangle 3 4
 
 -- =============================================================================
 -- Field Access
@@ -44,8 +44,8 @@ def getX := [Meirei|
   }
 ]
 
-#check getX                  -- Point → Int
-#eval getX (Point.mk 10 20) -- 10
+#check getX
+#guard getX (Point.mk 10 20) == 10
 
 def getY := [Meirei|
   def getY(p: Point): Int {
@@ -53,7 +53,7 @@ def getY := [Meirei|
   }
 ]
 
-#eval getY (Point.mk 10 20) -- 20
+#guard getY (Point.mk 10 20) == 20
 
 -- =============================================================================
 -- Constructor Calls
@@ -65,8 +65,8 @@ def makeCircle := [Meirei|
   }
 ]
 
-#check makeCircle          -- Int → Shape
-#eval makeCircle 7         -- Shape.Circle 7
+#check makeCircle
+#guard makeCircle 7 == Shape.Circle 7
 
 def makeRect := [Meirei|
   def makeRect(w: Int, h: Int): Shape {
@@ -74,8 +74,8 @@ def makeRect := [Meirei|
   }
 ]
 
-#check makeRect            -- Int → Int → Shape
-#eval makeRect 3 4         -- Shape.Rectangle 3 4
+#check makeRect
+#guard makeRect 3 4 == Shape.Rectangle 3 4
 
 -- =============================================================================
 -- Pattern Matching on Enums
@@ -90,9 +90,9 @@ def describeShape := [Meirei|
   }
 ]
 
-#check describeShape                         -- Shape → Int
-#eval describeShape (Shape.Circle 5)         -- 5
-#eval describeShape (Shape.Rectangle 3 4)    -- 7
+#check describeShape
+#guard describeShape (Shape.Circle 5) == 5
+#guard describeShape (Shape.Rectangle 3 4) == 7
 
 -- =============================================================================
 -- Combined: Struct + Field Access + Arithmetic
@@ -104,9 +104,9 @@ def manhattanDistance := [Meirei|
   }
 ]
 
-#check manhattanDistance                      -- Point → Int
-#eval manhattanDistance (Point.mk 3 4)        -- 7
-#eval manhattanDistance (Point.mk 10 20)      -- 30
+#check manhattanDistance
+#guard manhattanDistance (Point.mk 3 4) == 7
+#guard manhattanDistance (Point.mk 10 20) == 30
 
 -- =============================================================================
 -- AST Printing for New Constructs
@@ -131,16 +131,9 @@ def manhattanDistance := [Meirei|
 -- Binary tree: Leaf has no data, Node holds a value and two subtrees
 meirei_type enum IntTree { Leaf(), Node(value: Int, left: IntTree, right: IntTree) }
 
-#check IntTree              -- Type
-#check IntTree.Leaf         -- IntTree
-#check IntTree.Node         -- Int → IntTree → IntTree → IntTree
-
--- Build some trees by hand
-#eval IntTree.Leaf
-#eval IntTree.Node 1 IntTree.Leaf IntTree.Leaf
-#eval IntTree.Node 10
-        (IntTree.Node 5 IntTree.Leaf IntTree.Leaf)
-        (IntTree.Node 15 IntTree.Leaf IntTree.Leaf)
+#check IntTree
+#check IntTree.Leaf
+#check IntTree.Node
 
 -- =============================================================================
 -- Pattern Matching on Recursive Types
@@ -156,8 +149,8 @@ def isLeaf := [Meirei|
   }
 ]
 
-#eval isLeaf IntTree.Leaf                                    -- 1
-#eval isLeaf (IntTree.Node 42 IntTree.Leaf IntTree.Leaf)     -- 0
+#guard isLeaf IntTree.Leaf == 1
+#guard isLeaf (IntTree.Node 42 IntTree.Leaf IntTree.Leaf) == 0
 
 -- Extract root value (0 for leaves)
 def rootValue := [Meirei|
@@ -169,8 +162,8 @@ def rootValue := [Meirei|
   }
 ]
 
-#eval rootValue IntTree.Leaf                                 -- 0
-#eval rootValue (IntTree.Node 42 IntTree.Leaf IntTree.Leaf)  -- 42
+#guard rootValue IntTree.Leaf == 0
+#guard rootValue (IntTree.Node 42 IntTree.Leaf IntTree.Leaf) == 42
 
 -- Construct a single-node tree from a value
 def singletonTree := [Meirei|
@@ -179,8 +172,8 @@ def singletonTree := [Meirei|
   }
 ]
 
-#check singletonTree                                         -- Int → IntTree
-#eval singletonTree 99  -- IntTree.Node 99 IntTree.Leaf IntTree.Leaf
+#check singletonTree
+#guard singletonTree 99 == IntTree.Node 99 IntTree.Leaf IntTree.Leaf
 
 -- Build a tree with a given root and two leaf children holding given values
 def threeNodeTree := [Meirei|
@@ -191,9 +184,10 @@ def threeNodeTree := [Meirei|
   }
 ]
 
-#eval threeNodeTree 10 5 15
--- IntTree.Node 10 (IntTree.Node 5 IntTree.Leaf IntTree.Leaf)
---                  (IntTree.Node 15 IntTree.Leaf IntTree.Leaf)
+#guard threeNodeTree 10 5 15 ==
+  IntTree.Node 10
+    (IntTree.Node 5 IntTree.Leaf IntTree.Leaf)
+    (IntTree.Node 15 IntTree.Leaf IntTree.Leaf)
 
 -- =============================================================================
 -- Recursive Linked List
@@ -201,11 +195,9 @@ def threeNodeTree := [Meirei|
 
 meirei_type enum IntList { Nil(), Cons(head: Int, tail: IntList) }
 
-#check IntList          -- Type
-#check IntList.Nil      -- IntList
-#check IntList.Cons     -- Int → IntList → IntList
-
-#eval IntList.Cons 1 (IntList.Cons 2 (IntList.Cons 3 IntList.Nil))
+#check IntList
+#check IntList.Nil
+#check IntList.Cons
 
 -- Get the head element (0 for empty lists)
 def headOrZero := [Meirei|
@@ -217,9 +209,9 @@ def headOrZero := [Meirei|
   }
 ]
 
-#eval headOrZero IntList.Nil                              -- 0
-#eval headOrZero (IntList.Cons 42 IntList.Nil)            -- 42
-#eval headOrZero (IntList.Cons 1 (IntList.Cons 2 IntList.Nil))  -- 1
+#guard headOrZero IntList.Nil == 0
+#guard headOrZero (IntList.Cons 42 IntList.Nil) == 42
+#guard headOrZero (IntList.Cons 1 (IntList.Cons 2 IntList.Nil)) == 1
 
 -- Prepend a value to a list
 def prepend := [Meirei|
@@ -228,8 +220,8 @@ def prepend := [Meirei|
   }
 ]
 
-#eval prepend 0 (IntList.Cons 1 (IntList.Cons 2 IntList.Nil))
--- IntList.Cons 0 (IntList.Cons 1 (IntList.Cons 2 IntList.Nil))
+#guard prepend 0 (IntList.Cons 1 (IntList.Cons 2 IntList.Nil)) ==
+  IntList.Cons 0 (IntList.Cons 1 (IntList.Cons 2 IntList.Nil))
 
 -- =============================================================================
 -- Optional (Maybe) Type
@@ -247,8 +239,8 @@ def getOrDefault := [Meirei|
   }
 ]
 
-#eval getOrDefault OptionalInt.None 0              -- 0
-#eval getOrDefault (OptionalInt.Some 42) 0         -- 42
+#guard getOrDefault OptionalInt.None 0 == 0
+#guard getOrDefault (OptionalInt.Some 42) 0 == 42
 
 -- Safe division: returns None on divide-by-zero
 def safeDivide := [Meirei|
@@ -261,5 +253,5 @@ def safeDivide := [Meirei|
   }
 ]
 
-#eval safeDivide 10 3   -- OptionalInt.Some 3
-#eval safeDivide 10 0   -- OptionalInt.None
+#guard safeDivide 10 3 == OptionalInt.Some 3
+#guard safeDivide 10 0 == OptionalInt.None

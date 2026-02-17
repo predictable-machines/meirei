@@ -70,6 +70,20 @@ private def extractStrLit (stx : Syntax) : Option String :=
       alt.isStrLit? <|> alt[0]?.bind (·.isStrLit?)
   else none)
 
+/-- Build a hierarchical Lean.Name from a base identifier and dotted parts.
+    e.g. `String` + `[append]` → `String.append` -/
+private def buildQualifiedName (base : TSyntax `ident) (parts : Array (TSyntax `ident)) : Name :=
+  parts.foldl (fun acc part => acc ++ part.getId) base.getId
+
+/-- Decompose a hierarchical Lean.Name into its string components.
+    Lean's tokenizer merges dotted identifiers (e.g. `p.fst`) into a single
+    ident token, so we split them here for the parser to distinguish field
+    access from qualified names. -/
+private def nameComponents : Name → List String
+  | .str .anonymous s => [s]
+  | .str parent s => nameComponents parent ++ [s]
+  | _ => []
+
 mutual
 
 /-- Parse a function call argument (expression or string literal) -/
@@ -95,7 +109,18 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     let name := x.getId
     if name == `true then return MeireiExpr.boolLit true
     else if name == `false then return MeireiExpr.boolLit false
-    else return MeireiExpr.var name
+    else
+      -- Lean's tokenizer merges dotted names (e.g. `p.fst`) into a single
+      -- ident token, bypassing the `imp_expr "." ident` syntax rule.
+      -- Decompose multi-component names into a fieldAccess chain so the
+      -- elaborator can properly version variables (e.g. `p` → `p_0` in loops).
+      match nameComponents name with
+      | first :: second :: rest =>
+        let base := MeireiExpr.var (Name.mkSimple first)
+        return rest.foldl
+          (fun acc part => MeireiExpr.fieldAccess acc (Name.mkSimple part))
+          (MeireiExpr.fieldAccess base (Name.mkSimple second))
+      | _ => return MeireiExpr.var name
 
   | `(imp_expr| $a:imp_expr + $b:imp_expr) => do
     let a' ← parseExpr a
@@ -106,6 +131,11 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     let a' ← parseExpr a
     let b' ← parseExpr b
     return MeireiExpr.binOp BinOp.sub a' b'
+
+  | `(imp_expr| $a:imp_expr ++ $b:imp_expr) => do
+    let a' ← parseExpr a
+    let b' ← parseExpr b
+    return MeireiExpr.binOp BinOp.append a' b'
 
   | `(imp_expr| $a:imp_expr * $b:imp_expr) => do
     let a' ← parseExpr a
@@ -166,9 +196,9 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     let a' ← parseExpr a
     return MeireiExpr.unaryOp UnaryOp.not_ a'
 
-  | `(imp_expr| $f:ident ( $args,* )) => do
+  | `(imp_expr| $f:ident $[. $parts:ident]* ( $args,* )) => do
     let args' ← args.getElems.toList.mapM parseArg
-    return MeireiExpr.call f.getId args'
+    return MeireiExpr.call (buildQualifiedName f parts) args'
 
   | `(imp_expr| ( $e:imp_expr )) =>
     parseExpr e
@@ -244,13 +274,13 @@ partial def parseStmt (stx : TSyntax `imp_stmt) : MacroM MeireiStmt := do
     let stmts' ← stmts.toList.mapM parseStmt
     return MeireiStmt.block stmts'
 
-  | `(imp_stmt| $f:ident ( $args,* ) ;) => do
+  | `(imp_stmt| $f:ident $[. $parts:ident]* ( $args,* ) ;) => do
     let args' ← args.getElems.toList.mapM parseArg
-    return MeireiStmt.effectCall f.getId args'
+    return MeireiStmt.effectCall (buildQualifiedName f parts) args'
 
-  | `(imp_stmt| $y:ident <- $f:ident ( $args,* ) ;) => do
+  | `(imp_stmt| $y:ident <- $f:ident $[. $parts:ident]* ( $args,* ) ;) => do
     let args' ← args.getElems.toList.mapM parseArg
-    return MeireiStmt.effectBind y.getId f.getId args'
+    return MeireiStmt.effectBind y.getId (buildQualifiedName f parts) args'
 
   | `(imp_stmt| match $scrutinee:imp_expr { $arms* }) => do
     let scrutinee' ← parseExpr scrutinee

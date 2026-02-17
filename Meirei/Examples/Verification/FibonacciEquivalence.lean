@@ -41,15 +41,15 @@ def fibRecInt (n : Int) : Nat :=
   else fibRec n.toNat
 
 -- Test recursive Fibonacci
-#eval fibRecInt 0   -- 0
-#eval fibRecInt 1   -- 1
-#eval fibRecInt 2   -- 1
-#eval fibRecInt 3   -- 2
-#eval fibRecInt 4   -- 3
-#eval fibRecInt 5   -- 5
-#eval fibRecInt 6   -- 8
-#eval fibRecInt 7   -- 13
-#eval fibRecInt 10  -- 55
+#guard fibRecInt 0 == 0
+#guard fibRecInt 1 == 1
+#guard fibRecInt 2 == 1
+#guard fibRecInt 3 == 2
+#guard fibRecInt 4 == 3
+#guard fibRecInt 5 == 5
+#guard fibRecInt 6 == 8
+#guard fibRecInt 7 == 13
+#guard fibRecInt 10 == 55
 
 -- =============================================================================
 -- HELPER LEMMAS
@@ -146,8 +146,8 @@ example : fib 5 = fibRec 5 := by exact fib_eq_fibRec 5
 example : fib 10 = fibRec 10 := by exact fib_eq_fibRec 10
 
 -- Verify they compute the same values
-#eval fib 8 == fibRecInt 8      -- true
-#eval fib 12 == fibRecInt 12    -- true
+#guard fib 8 == fibRecInt 8
+#guard fib 12 == fibRecInt 12
 
 #print fib
 #print fibRec

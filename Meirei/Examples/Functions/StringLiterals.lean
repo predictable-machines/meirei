@@ -23,7 +23,7 @@ def returnString := [Meirei|
   }
 ]
 
-#eval returnString  -- "hello world"
+#guard returnString == "hello world"
 
 -- Empty string
 def returnEmpty := [Meirei|
@@ -32,7 +32,7 @@ def returnEmpty := [Meirei|
   }
 ]
 
-#eval returnEmpty  -- ""
+#guard returnEmpty == ""
 
 -- String with spaces and punctuation
 def returnPunctuation := [Meirei|
@@ -41,7 +41,7 @@ def returnPunctuation := [Meirei|
   }
 ]
 
-#eval returnPunctuation  -- "Hello, World! 123"
+#guard returnPunctuation == "Hello, World! 123"
 
 -- =============================================================================
 -- 2. Variable Initialization (var requires a loop to be useful)
@@ -58,8 +58,8 @@ def varInitPreserved := [Meirei|
   }
 ]
 
-#eval varInitPreserved []   -- "initialized"
-#eval varInitPreserved [1]  -- "changed"
+#guard varInitPreserved [] == "initialized"
+#guard varInitPreserved [1] == "changed"
 
 -- Empty string as var initializer
 def varInitEmpty := [Meirei|
@@ -72,8 +72,8 @@ def varInitEmpty := [Meirei|
   }
 ]
 
-#eval varInitEmpty []   -- ""
-#eval varInitEmpty [1]  -- "notempty"
+#guard varInitEmpty [] == ""
+#guard varInitEmpty [1] == "notempty"
 
 -- =============================================================================
 -- 3. Variable Assignment in Loop
@@ -89,9 +89,9 @@ def assignInLoop := [Meirei|
   }
 ]
 
-#eval assignInLoop []   -- "none"
-#eval assignInLoop [1]  -- "found"
-#eval assignInLoop [1, 2, 3]  -- "found"
+#guard assignInLoop [] == "none"
+#guard assignInLoop [1] == "found"
+#guard assignInLoop [1, 2, 3] == "found"
 
 -- =============================================================================
 -- 4. String as Function Argument (Constructor Calls)
@@ -106,8 +106,8 @@ def makeTag := [Meirei|
   }
 ]
 
-#eval makeTag 1  -- { label := "default", priority := 1 }
-#eval makeTag 0  -- { label := "default", priority := 0 }
+#guard makeTag 1 == NameTag.mk "default" 1
+#guard makeTag 0 == NameTag.mk "default" 0
 
 -- String argument from parameter forwarded alongside literal
 def makeTagWith := [Meirei|
@@ -116,7 +116,7 @@ def makeTagWith := [Meirei|
   }
 ]
 
-#eval makeTagWith "alice" 5  -- { label := "alice", priority := 5 }
+#guard makeTagWith "alice" 5 == NameTag.mk "alice" 5
 
 -- =============================================================================
 -- 5. Multiple String Fields in Struct
@@ -130,7 +130,7 @@ def makeFullName := [Meirei|
   }
 ]
 
-#eval makeFullName  -- { first := "Jane", last := "Doe" }
+#guard makeFullName == FullName.mk "Jane" "Doe"
 
 -- Mix of literal and parameter strings
 def makeFullNameWith := [Meirei|
@@ -139,7 +139,7 @@ def makeFullNameWith := [Meirei|
   }
 ]
 
-#eval makeFullNameWith "Alice"  -- { first := "Alice", last := "Unknown" }
+#guard makeFullNameWith "Alice" == FullName.mk "Alice" "Unknown"
 
 -- =============================================================================
 -- 6. String Comparison (==)
@@ -155,9 +155,9 @@ def isAlice := [Meirei|
   }
 ]
 
-#eval isAlice "alice"  -- 1
-#eval isAlice "bob"    -- 0
-#eval isAlice ""       -- 0
+#guard isAlice "alice" == 1
+#guard isAlice "bob" == 0
+#guard isAlice "" == 0
 
 -- Compare two positions: parameter vs literal on both sides
 def matchesGreeting := [Meirei|
@@ -174,9 +174,9 @@ def matchesGreeting := [Meirei|
   }
 ]
 
-#eval matchesGreeting "hello"  -- 1
-#eval matchesGreeting "hi"     -- 2
-#eval matchesGreeting "hey"    -- 0
+#guard matchesGreeting "hello" == 1
+#guard matchesGreeting "hi" == 2
+#guard matchesGreeting "hey" == 0
 
 -- =============================================================================
 -- 7. String with Option Types
@@ -193,9 +193,9 @@ def maybeGreet := [Meirei|
   }
 ]
 
-#check maybeGreet                  -- Int → Option String
-#eval maybeGreet 1                 -- some "hello"
-#eval maybeGreet 0                 -- none
+#check maybeGreet
+#guard maybeGreet 1 == some "hello"
+#guard maybeGreet 0 == none
 
 -- Struct with optional string field
 meirei_type struct UserProfile { name: String, nickname: String? }
@@ -206,7 +206,7 @@ def makeProfile := [Meirei|
   }
 ]
 
-#eval makeProfile "alice"  -- { name := "alice", nickname := none }
+#guard makeProfile "alice" == UserProfile.mk "alice" none
 
 def makeProfileWithNick := [Meirei|
   def makeProfileWithNick(name: String, nick: String): UserProfile {
@@ -214,8 +214,7 @@ def makeProfileWithNick := [Meirei|
   }
 ]
 
-#eval makeProfileWithNick "alice" "ally"
--- { name := "alice", nickname := some "ally" }
+#guard makeProfileWithNick "alice" "ally" == UserProfile.mk "alice" (some "ally")
 
 -- =============================================================================
 -- 8. String in Enum Constructors
@@ -229,7 +228,7 @@ def greetAlice := [Meirei|
   }
 ]
 
-#eval greetAlice  -- Greeting.Hello "alice"
+#guard greetAlice == Greeting.Hello "alice"
 
 def farewellTo := [Meirei|
   def farewellTo(name: String): Greeting {
@@ -237,7 +236,7 @@ def farewellTo := [Meirei|
   }
 ]
 
-#eval farewellTo "bob"  -- Greeting.Goodbye "bob"
+#guard farewellTo "bob" == Greeting.Goodbye "bob"
 
 -- =============================================================================
 -- 9. Pattern Matching with String Fields
@@ -254,9 +253,9 @@ def greetingName := [Meirei|
   }
 ]
 
-#eval greetingName (Greeting.Hello "alice")    -- "alice"
-#eval greetingName (Greeting.Goodbye "bob")    -- "bob"
-#eval greetingName Greeting.Anonymous          -- "unknown"
+#guard greetingName (Greeting.Hello "alice") == "alice"
+#guard greetingName (Greeting.Goodbye "bob") == "bob"
+#guard greetingName Greeting.Anonymous == "unknown"
 
 -- =============================================================================
 -- 10. String Field Access
@@ -268,7 +267,7 @@ def getLabel := [Meirei|
   }
 ]
 
-#eval getLabel (NameTag.mk "urgent" 1)  -- "urgent"
+#guard getLabel (NameTag.mk "urgent" 1) == "urgent"
 
 def getFirst := [Meirei|
   def getFirst(name: FullName): String {
@@ -276,7 +275,7 @@ def getFirst := [Meirei|
   }
 ]
 
-#eval getFirst (FullName.mk "Jane" "Doe")  -- "Jane"
+#guard getFirst (FullName.mk "Jane" "Doe") == "Jane"
 
 -- =============================================================================
 -- 11. String Passed Through Multiple Functions
@@ -289,9 +288,9 @@ def roundTrip := [Meirei|
   }
 ]
 
-#eval roundTrip "test"   -- "test"
-#eval roundTrip ""       -- ""
-#eval roundTrip "hello"  -- "hello"
+#guard roundTrip "test" == "test"
+#guard roundTrip "" == ""
+#guard roundTrip "hello" == "hello"
 
 -- =============================================================================
 -- 12. String in Conditional Assignment
@@ -307,9 +306,9 @@ def conditionalString := [Meirei|
   }
 ]
 
-#eval conditionalString 1  -- "one"
-#eval conditionalString 0  -- "other"
-#eval conditionalString 2  -- "other"
+#guard conditionalString 1 == "one"
+#guard conditionalString 0 == "other"
+#guard conditionalString 2 == "other"
 
 -- =============================================================================
 -- 13. String in Nested Struct Construction
@@ -323,7 +322,7 @@ def origin := [Meirei|
   }
 ]
 
-#eval origin  -- { label := "origin", x := 0, y := 0 }
+#guard origin == LabeledPoint.mk "origin" 0 0
 
 def namedPoint := [Meirei|
   def namedPoint(name: String, x: Int, y: Int): LabeledPoint {
@@ -331,8 +330,8 @@ def namedPoint := [Meirei|
   }
 ]
 
-#eval namedPoint "A" 3 4    -- { label := "A", x := 3, y := 4 }
-#eval namedPoint "B" 10 20  -- { label := "B", x := 10, y := 20 }
+#guard namedPoint "A" 3 4 == LabeledPoint.mk "A" 3 4
+#guard namedPoint "B" 10 20 == LabeledPoint.mk "B" 10 20
 
 -- =============================================================================
 -- 14. String Equality Across Field Access
@@ -357,10 +356,10 @@ def hasLabelInList := [Meirei|
   }
 ]
 
-#eval hasLabelInList [NameTag.mk "a" 1, NameTag.mk "b" 2] "a"  -- 1
-#eval hasLabelInList [NameTag.mk "a" 1, NameTag.mk "b" 2] "b"  -- 1
-#eval hasLabelInList [NameTag.mk "a" 1, NameTag.mk "b" 2] "c"  -- 0
-#eval hasLabelInList [] "a"  -- 0
+#guard hasLabelInList [NameTag.mk "a" 1, NameTag.mk "b" 2] "a" == 1
+#guard hasLabelInList [NameTag.mk "a" 1, NameTag.mk "b" 2] "b" == 1
+#guard hasLabelInList [NameTag.mk "a" 1, NameTag.mk "b" 2] "c" == 0
+#guard hasLabelInList [] "a" == 0
 
 -- Search for a literal string in a list of tags
 def hasDefaultTag := [Meirei|
@@ -374,9 +373,9 @@ def hasDefaultTag := [Meirei|
   }
 ]
 
-#eval hasDefaultTag [NameTag.mk "default" 0]            -- 1
-#eval hasDefaultTag [NameTag.mk "other" 1]              -- 0
-#eval hasDefaultTag [NameTag.mk "a" 1, NameTag.mk "default" 0]  -- 1
+#guard hasDefaultTag [NameTag.mk "default" 0] == 1
+#guard hasDefaultTag [NameTag.mk "other" 1] == 0
+#guard hasDefaultTag [NameTag.mk "a" 1, NameTag.mk "default" 0] == 1
 
 -- =============================================================================
 -- 15. Identity: String Parameter → String Return
@@ -388,8 +387,8 @@ def echoString := [Meirei|
   }
 ]
 
-#eval echoString "anything"  -- "anything"
-#eval echoString ""          -- ""
-#eval echoString "123"       -- "123"
+#guard echoString "anything" == "anything"
+#guard echoString "" == ""
+#guard echoString "123" == "123"
 
 end StringLiteralTests

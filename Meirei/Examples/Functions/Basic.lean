@@ -16,8 +16,8 @@ def intSum_example := [Meirei|
   }
 ]
 
-#check intSum_example  -- Should type-check as: Int → Int → Int
-#eval intSum_example 5 3  -- Should evaluate to 8
+#check intSum_example
+#guard intSum_example 5 3 == 8
 
 -- Example 2: mySum function using term-level syntax
 def mySum_example := [Meirei|
@@ -30,9 +30,9 @@ def mySum_example := [Meirei|
   }
 ]
 
-#check mySum_example   -- Should type-check as: List Int → Int
+#check mySum_example
 #print mySum_example
-#eval mySum_example [1, 2, 3, 4, 5]  -- Should evaluate to 15
+#guard mySum_example [1, 2, 3, 4, 5] == 15
 
 -- Note: More complex patterns (multiple variables, nested loops, etc.)
 -- are not yet supported by the expander. See ImperativeExpanderExamples.lean

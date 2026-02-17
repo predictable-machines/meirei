@@ -9,6 +9,13 @@ import PredictableVerification.IR.Meirei.Index
 
 open Meirei
 
+-- Lean's Except doesn't have BEq by default; needed for #guard assertions
+instance [BEq ε] [BEq α] : BEq (Except ε α) where
+  beq
+    | .ok a, .ok b => a == b
+    | .error e1, .error e2 => e1 == e2
+    | _, _ => false
+
 -- Case 1: Pure throw (no loop)
 -- throw → Except.error, return → Except.ok
 -- if-then guard nesting transforms: if (x < 0) { throw "negative"; } return x;
@@ -21,8 +28,8 @@ def validate := [Meirei|
 ]
 
 #meirei_print validate
-#eval validate 5      -- Except.ok 5
-#eval validate (-1)   -- Except.error "negative"
+#guard validate 5 == Except.ok 5
+#guard validate (-1) == Except.error "negative"
 
 -- Case 2: Throw in loop with accumulation
 -- Uses Except fold: accumulator is Except(String, Int), short-circuits on error.
@@ -39,8 +46,8 @@ def sumPositive := [Meirei|
 ]
 
 #meirei_print sumPositive
-#eval sumPositive [1, 2, 3]     -- Except.ok 6
-#eval sumPositive [1, -2, 3]    -- Except.error "negative found"
+#guard sumPositive [1, 2, 3] == Except.ok 6
+#guard sumPositive [1, -2, 3] == Except.error "negative found"
 
 -- Case 3: Multiple validation guards
 -- Each throw guard nests as another if-then-else level in the output.
@@ -54,10 +61,10 @@ def validateRange := [Meirei|
 ]
 
 #meirei_print validateRange
-#eval validateRange (-5)    -- Except.error "negative"
-#eval validateRange 0       -- Except.error "zero not allowed"
-#eval validateRange 1001    -- Except.error "too large"
-#eval validateRange 42      -- Except.ok 42
+#guard validateRange (-5) == Except.error "negative"
+#guard validateRange 0 == Except.error "zero not allowed"
+#guard validateRange 1001 == Except.error "too large"
+#guard validateRange 42 == Except.ok 42
 
 -- Case 4: Computation between guards
 -- Variable declarations create let-bindings; a later guard checks the computed result.
@@ -72,9 +79,9 @@ def safeDivMod := [Meirei|
 ]
 
 #meirei_print safeDivMod
-#eval safeDivMod 10 0     -- Except.error "division by zero"
-#eval safeDivMod 3 10     -- Except.error "quotient is zero"
-#eval safeDivMod 10 3     -- Except.ok 4
+#guard safeDivMod 10 0 == Except.error "division by zero"
+#guard safeDivMod 3 10 == Except.error "quotient is zero"
+#guard safeDivMod 10 3 == Except.ok 4
 
 -- Case 5: Guards followed by if-else branching
 -- After validation, each branch of the if-else returns a different computation.
@@ -91,10 +98,10 @@ def classifyAndScale := [Meirei|
 ]
 
 #meirei_print classifyAndScale
-#eval classifyAndScale (-5) 2     -- Except.error "negative score"
-#eval classifyAndScale 101 2      -- Except.error "score out of range"
-#eval classifyAndScale 60 3       -- Except.ok 180
-#eval classifyAndScale 30 5       -- Except.ok 35
+#guard classifyAndScale (-5) 2 == Except.error "negative score"
+#guard classifyAndScale 101 2 == Except.error "score out of range"
+#guard classifyAndScale 60 3 == Except.ok 180
+#guard classifyAndScale 30 5 == Except.ok 35
 
 -- Case 6: Pre-loop validation combined with throw inside the loop
 -- The guard before the loop nests as if-then-else.
@@ -112,9 +119,9 @@ def sumBounded := [Meirei|
 ]
 
 #meirei_print sumBounded
-#eval sumBounded [1, 2, 3] 10      -- Except.ok 6
-#eval sumBounded [1, 2, 3] 0       -- Except.error "bound must be positive"
-#eval sumBounded [1, 20, 3] 10     -- Except.error "element exceeds bound"
+#guard sumBounded [1, 2, 3] 10 == Except.ok 6
+#guard sumBounded [1, 2, 3] 0 == Except.error "bound must be positive"
+#guard sumBounded [1, 20, 3] 10 == Except.error "element exceeds bound"
 
 -- ========= Effectful + Throw Examples =========
 
@@ -124,18 +131,18 @@ def sumBounded := [Meirei|
 
 inductive FetchAmountError where
   | orderNotFound
-  deriving Repr
+  deriving Repr, BEq
 
 inductive FetchDiscountError where
   | noData
-  deriving Repr
+  deriving Repr, BEq
 
 inductive ProcessOrderError where
   | fetchAmount : FetchAmountError → ProcessOrderError
   | fetchDiscount : FetchDiscountError → ProcessOrderError
   | invalidAmount : ProcessOrderError
   | discountExceedsAmount : ProcessOrderError
-  deriving Repr
+  deriving Repr, BEq
 
 abbrev EffectM (ε : Type) (α : Type) := Except ε α
 
@@ -162,11 +169,11 @@ def processOrder := [Meirei|
 ]
 
 #meirei_print processOrder
-#eval processOrder 0        -- .fetchAmount .orderNotFound (from fetchAmount)
-#eval processOrder 2        -- .invalidAmount (amount = -1)
-#eval processOrder 4        -- .discountExceedsAmount (amount=1, discount=2)
-#eval processOrder 200      -- .fetchDiscount .noData (from fetchDiscount)
-#eval processOrder 10       -- Except.ok 2 (amount=7, discount=5)
+#guard processOrder 0 == Except.error (.fetchAmount .orderNotFound)
+#guard processOrder 2 == Except.error .invalidAmount
+#guard processOrder 4 == Except.error .discountExceedsAmount
+#guard processOrder 200 == Except.error (.fetchDiscount .noData)
+#guard processOrder 10 == Except.ok 2
 
 -- ========= Edge Cases for Except Fold =========
 
@@ -189,9 +196,9 @@ def sumPositiveEvenOnly := [Meirei|
 ]
 
 #meirei_print sumPositiveEvenOnly
-#eval sumPositiveEvenOnly [2, 4, 6]      -- Except.ok 12
-#eval sumPositiveEvenOnly [2, (-1), 6]   -- Except.error "negative found"
-#eval sumPositiveEvenOnly [2, 3, 6]      -- Except.error "odd number found"
+#guard sumPositiveEvenOnly [2, 4, 6] == Except.ok 12
+#guard sumPositiveEvenOnly [2, (-1), 6] == Except.error "negative found"
+#guard sumPositiveEvenOnly [2, 3, 6] == Except.error "odd number found"
 
 -- Case 9: Multiple variables modified in Except fold loop
 -- Tests that loop with throw can still accumulate into multiple variables.
@@ -209,8 +216,8 @@ def sumAndCount := [Meirei|
 ]
 
 #meirei_print sumAndCount
-#eval sumAndCount [1, 2, 3] 10     -- Except.ok 9 (sum=6, count=3)
-#eval sumAndCount [1, 20, 3] 10    -- Except.error "exceeds limit"
+#guard sumAndCount [1, 2, 3] 10 == Except.ok 9  -- sum=6, count=3
+#guard sumAndCount [1, 20, 3] 10 == Except.error "exceeds limit"
 
 -- Case 10: Throw with computation before it in loop
 -- Tests that computation before a throw in a loop body works correctly.
@@ -227,9 +234,9 @@ def sumWithMax := [Meirei|
 ]
 
 #meirei_print sumWithMax
-#eval sumWithMax [1, 2, 3] 100    -- Except.ok 6
-#eval sumWithMax [1, 2, 3] 5      -- Except.error "sum exceeded max"
-#eval sumWithMax [10, 20] 15      -- Except.error "sum exceeded max" (at second element)
+#guard sumWithMax [1, 2, 3] 100 == Except.ok 6
+#guard sumWithMax [1, 2, 3] 5 == Except.error "sum exceeded max"
+#guard sumWithMax [10, 20] 15 == Except.error "sum exceeded max"
 
 -- Case 11: Early return guard tests (showing optimization for if-then guards)
 -- The early return guard optimization transforms: if (c) { return v; } rest
@@ -244,7 +251,7 @@ def validateMultiple := [Meirei|
 ]
 
 #meirei_print validateMultiple
-#eval validateMultiple (-5) 10   -- Except.ok 0 (early return guard)
-#eval validateMultiple 5 (-10)   -- Except.error "y is negative" (throw guard)
-#eval validateMultiple 0 10      -- Except.ok 10 (early return on x == 0)
-#eval validateMultiple 5 10      -- Except.ok 15 (normal path)
+#guard validateMultiple (-5) 10 == Except.ok 0    -- early return guard
+#guard validateMultiple 5 (-10) == Except.error "y is negative"
+#guard validateMultiple 0 10 == Except.ok 10      -- early return on x == 0
+#guard validateMultiple 5 10 == Except.ok 15

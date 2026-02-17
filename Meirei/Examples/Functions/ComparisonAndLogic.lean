@@ -29,11 +29,11 @@ def clamp := [Meirei|
 ]
 
 #check clamp
-#eval clamp 5 0 10   -- 5
-#eval clamp (-3) 0 10 -- 0
-#eval clamp 15 0 10  -- 10
-#eval clamp 0 0 10   -- 0  (boundary: x == lo)
-#eval clamp 10 0 10  -- 10 (boundary: x == hi)
+#guard clamp 5 0 10 == 5
+#guard clamp (-3) 0 10 == 0
+#guard clamp 15 0 10 == 10
+#guard clamp 0 0 10 == 0   -- boundary: x == lo
+#guard clamp 10 0 10 == 10 -- boundary: x == hi
 
 -- Not-equal: return 0 if a == b, otherwise a - b
 def diffOrZero := [Meirei|
@@ -46,8 +46,8 @@ def diffOrZero := [Meirei|
 ]
 
 #check diffOrZero
-#eval diffOrZero 10 3  -- 7
-#eval diffOrZero 5 5   -- 0
+#guard diffOrZero 10 3 == 7
+#guard diffOrZero 5 5 == 0
 
 -- =============================================================================
 -- Modulo operator: %
@@ -64,9 +64,9 @@ def isEven := [Meirei|
 ]
 
 #check isEven
-#eval isEven 4  -- 1
-#eval isEven 7  -- 0
-#eval isEven 0  -- 1
+#guard isEven 4 == 1
+#guard isEven 7 == 0
+#guard isEven 0 == 1
 
 -- FizzBuzz-style classifier using modulo
 -- Returns 3 for divisible by both, 2 for divisible by 5, 1 for divisible by 3, 0 otherwise
@@ -85,10 +85,10 @@ def fizzBuzzClassify := [Meirei|
   }
 ]
 
-#eval fizzBuzzClassify 15  -- 3 (both)
-#eval fizzBuzzClassify 9   -- 1 (div by 3)
-#eval fizzBuzzClassify 10  -- 2 (div by 5)
-#eval fizzBuzzClassify 7   -- 0 (neither)
+#guard fizzBuzzClassify 15 == 3  -- both
+#guard fizzBuzzClassify 9 == 1   -- div by 3
+#guard fizzBuzzClassify 10 == 2  -- div by 5
+#guard fizzBuzzClassify 7 == 0   -- neither
 
 -- =============================================================================
 -- Logical operators: &&, ||, !
@@ -102,10 +102,10 @@ def inRange := [Meirei|
 ]
 
 #check inRange
-#eval inRange 5 0 10   -- true
-#eval inRange 0 0 10   -- false (boundary)
-#eval inRange 10 0 10  -- false (boundary)
-#eval inRange 15 0 10  -- false
+#guard inRange 5 0 10 == true
+#guard inRange 0 0 10 == false   -- boundary
+#guard inRange 10 0 10 == false  -- boundary
+#guard inRange 15 0 10 == false
 
 -- Logical OR: check if a value is outside a range
 def outOfRange := [Meirei|
@@ -114,9 +114,9 @@ def outOfRange := [Meirei|
   }
 ]
 
-#eval outOfRange 5 0 10   -- false
-#eval outOfRange (-1) 0 10 -- true
-#eval outOfRange 11 0 10  -- true
+#guard outOfRange 5 0 10 == false
+#guard outOfRange (-1) 0 10 == true
+#guard outOfRange 11 0 10 == true
 
 -- Logical NOT
 def isOdd := [Meirei|
@@ -125,9 +125,9 @@ def isOdd := [Meirei|
   }
 ]
 
-#eval isOdd 3  -- true
-#eval isOdd 4  -- false
-#eval isOdd 0  -- false
+#guard isOdd 3 == true
+#guard isOdd 4 == false
+#guard isOdd 0 == false
 
 -- Combined: inclusive range check using && with <= and >=
 def inRangeInclusive := [Meirei|
@@ -136,10 +136,10 @@ def inRangeInclusive := [Meirei|
   }
 ]
 
-#eval inRangeInclusive 5 0 10   -- true
-#eval inRangeInclusive 0 0 10   -- true  (boundary)
-#eval inRangeInclusive 10 0 10  -- true  (boundary)
-#eval inRangeInclusive 11 0 10  -- false
+#guard inRangeInclusive 5 0 10 == true
+#guard inRangeInclusive 0 0 10 == true   -- boundary
+#guard inRangeInclusive 10 0 10 == true  -- boundary
+#guard inRangeInclusive 11 0 10 == false
 
 -- =============================================================================
 -- Compound expressions: mixing arithmetic, comparison, and logic
@@ -158,8 +158,8 @@ partial def sumEvenElements := [Meirei|
   }
 ]
 
-#eval sumEvenElements [1, 2, 3, 4, 5, 6]  -- 12 (2+4+6)
-#eval sumEvenElements [1, 3, 5]            -- 0
+#guard sumEvenElements [1, 2, 3, 4, 5, 6] == 12  -- 2+4+6
+#guard sumEvenElements [1, 3, 5] == 0
 
 -- While loop with compound condition
 -- Divide by 2 while even
@@ -173,9 +173,9 @@ partial def halveTillOdd := [Meirei|
   }
 ]
 
-#eval halveTillOdd 16  -- 1
-#eval halveTillOdd 24  -- 3
-#eval halveTillOdd 7   -- 7
+#guard halveTillOdd 16 == 1
+#guard halveTillOdd 24 == 3
+#guard halveTillOdd 7 == 7
 
 -- =============================================================================
 -- Boolean literals: true, false
@@ -188,7 +188,7 @@ def alwaysTrue := [Meirei|
   }
 ]
 
-#eval alwaysTrue  -- true
+#guard alwaysTrue == true
 
 -- Use boolean literals in conditional logic
 def classifySign := [Meirei|
@@ -200,9 +200,9 @@ def classifySign := [Meirei|
   }
 ]
 
-#eval classifySign 5   -- true
-#eval classifySign 0   -- false
-#eval classifySign (-3) -- false
+#guard classifySign 5 == true
+#guard classifySign 0 == false
+#guard classifySign (-3) == false
 
 -- Boolean literal as initial value in a loop
 partial def anyPositive := [Meirei|
@@ -217,7 +217,7 @@ partial def anyPositive := [Meirei|
   }
 ]
 
-#eval anyPositive [(-1), (-2), 3]  -- true
-#eval anyPositive [(-1), (-2)]     -- false
+#guard anyPositive [(-1), (-2), 3] == true
+#guard anyPositive [(-1), (-2)] == false
 
 end ComparisonAndLogic

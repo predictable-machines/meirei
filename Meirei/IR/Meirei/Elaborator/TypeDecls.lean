@@ -29,7 +29,7 @@ private def parseAndElabCommand (cmdStr : String) : Command.CommandElabM Unit :=
 def elabStructDef (sd : MeireiStructDef) : Command.CommandElabM Unit := do
   let fieldsStr := sd.fields.map (fun f =>
     s!"  {f.name} : {typeToLeanStr f.type}") |> String.intercalate "\n"
-  let cmdStr := s!"@[ext] structure {sd.name} where\n{fieldsStr}\n  deriving Repr, Inhabited"
+  let cmdStr := s!"@[ext] structure {sd.name} where\n{fieldsStr}\n  deriving Repr, BEq, Inhabited"
   parseAndElabCommand cmdStr
 
 /-- Elaborate an enum definition to a Lean `inductive` command -/
@@ -39,7 +39,7 @@ def elabEnumDef (ed : MeireiEnumDef) : Command.CommandElabM Unit := do
     let arrowStr := if paramTypes.isEmpty then toString ed.name
       else String.intercalate " → " (paramTypes ++ [toString ed.name])
     s!"  | {ctor.name} : {arrowStr}") |> String.intercalate "\n"
-  let cmdStr := s!"inductive {ed.name} where\n{ctorsStr}\n  deriving Repr, Inhabited"
+  let cmdStr := s!"inductive {ed.name} where\n{ctorsStr}\n  deriving Repr, BEq, Inhabited"
   parseAndElabCommand cmdStr
 
 end Meirei.Elaborator

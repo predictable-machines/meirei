@@ -32,11 +32,11 @@ def findFirstAbove10 := [Meirei|
 ]
 
 #check findFirstAbove10
-#eval findFirstAbove10 [1, 2, 3, 11, 15]  -- 11 ✓
-#eval findFirstAbove10 [1, 2, 3, 4, 5]    -- 0 ✓
-#eval findFirstAbove10 [6, 7, 8, 9]       -- 0 ✓
-#eval findFirstAbove10 [20, 1, 2]         -- 20 ✓
-#eval findFirstAbove10 []                 -- 0 ✓
+#guard findFirstAbove10 [1, 2, 3, 11, 15] == 11
+#guard findFirstAbove10 [1, 2, 3, 4, 5] == 0
+#guard findFirstAbove10 [6, 7, 8, 9] == 0
+#guard findFirstAbove10 [20, 1, 2] == 20
+#guard findFirstAbove10 [] == 0
 
 -- =============================================================================
 -- Example 2: Break with Multiplication
@@ -56,11 +56,11 @@ def productUntilZero := [Meirei|
 ]
 
 #check productUntilZero
-#eval productUntilZero [2, 3, 4]           -- 24 ✓
-#eval productUntilZero [2, 3, 0, 5]        -- 6 ✓
-#eval productUntilZero [0, 2, 3]           -- 1 ✓
-#eval productUntilZero [5]                 -- 5 ✓
-#eval productUntilZero []                  -- 1 ✓
+#guard productUntilZero [2, 3, 4] == 24
+#guard productUntilZero [2, 3, 0, 5] == 6
+#guard productUntilZero [0, 2, 3] == 1
+#guard productUntilZero [5] == 5
+#guard productUntilZero [] == 1
 
 -- =============================================================================
 -- Example 3: Another Nested If with Early Return
@@ -80,11 +80,11 @@ def findFirstInRange := [Meirei|
 ]
 
 #check findFirstInRange
-#eval findFirstInRange [1, 2, 3, 4, 5]      -- 3 ✓
-#eval findFirstInRange [1, 2, 25, 3]        -- 3 ✓
-#eval findFirstInRange [1, 2]               -- 0 ✓
-#eval findFirstInRange [10, 15, 5]          -- 10 ✓
-#eval findFirstInRange []                   -- 0 ✓
+#guard findFirstInRange [1, 2, 3, 4, 5] == 3
+#guard findFirstInRange [1, 2, 25, 3] == 3
+#guard findFirstInRange [1, 2] == 0
+#guard findFirstInRange [10, 15, 5] == 10
+#guard findFirstInRange [] == 0
 
 -- =============================================================================
 -- Example 4: If-Else Without Early Exit
@@ -105,10 +105,10 @@ def sumPositivesOnly := [Meirei|
 ]
 
 #check sumPositivesOnly
-#eval sumPositivesOnly [1, -2, 3, -4, 5]    -- 9 ✓
-#eval sumPositivesOnly [-1, -2, -3]         -- 0 ✓
-#eval sumPositivesOnly [10, 20, 30]         -- 60 ✓
-#eval sumPositivesOnly []                   -- 0 ✓
+#guard sumPositivesOnly [1, -2, 3, -4, 5] == 9
+#guard sumPositivesOnly [-1, -2, -3] == 0
+#guard sumPositivesOnly [10, 20, 30] == 60
+#guard sumPositivesOnly [] == 0
 
 -- =============================================================================
 -- Example 5: Negative Number Support
@@ -129,10 +129,10 @@ def countNegatives := [Meirei|
 ]
 
 #check countNegatives
-#eval countNegatives [1, -2, 3, -4, 5]      -- 2 ✓
-#eval countNegatives [-1, -2, -3]           -- 3 ✓
-#eval countNegatives [1, 2, 3]              -- 0 ✓
-#eval countNegatives []                     -- 0 ✓
+#guard countNegatives [1, -2, 3, -4, 5] == 2
+#guard countNegatives [-1, -2, -3] == 3
+#guard countNegatives [1, 2, 3] == 0
+#guard countNegatives [] == 0
 
 -- =============================================================================
 -- Example 6: Subtraction in Break Pattern
@@ -152,10 +152,10 @@ def decrementUntilZero := [Meirei|
 ]
 
 #check decrementUntilZero
-#eval decrementUntilZero [10, 20, 30]       -- 40 ✓
-#eval decrementUntilZero [100, 1, 2]        -- 0 ✓ (stops at 0)
-#eval decrementUntilZero [10]               -- 90 ✓
-#eval decrementUntilZero []                 -- 100 ✓
+#guard decrementUntilZero [10, 20, 30] == 40
+#guard decrementUntilZero [100, 1, 2] == 0
+#guard decrementUntilZero [10] == 90
+#guard decrementUntilZero [] == 100
 
 -- =============================================================================
 -- Example 7: Sequential If Statements with Break
@@ -177,11 +177,11 @@ def maxBeforeSentinel := [Meirei|
 ]
 
 #check maxBeforeSentinel
-#eval maxBeforeSentinel [5, 10, 3, 15, 2]       -- 15 ✓
-#eval maxBeforeSentinel [5, 10, -999, 100]      -- 10 ✓ (stops at -999)
-#eval maxBeforeSentinel [-999, 5, 10]           -- 0 ✓ (stops immediately)
-#eval maxBeforeSentinel [1, 2, 3]               -- 3 ✓
-#eval maxBeforeSentinel []                      -- 0 ✓
+#guard maxBeforeSentinel [5, 10, 3, 15, 2] == 15
+#guard maxBeforeSentinel [5, 10, -999, 100] == 10  -- stops at -999
+#guard maxBeforeSentinel [-999, 5, 10] == 0        -- stops immediately
+#guard maxBeforeSentinel [1, 2, 3] == 3
+#guard maxBeforeSentinel [] == 0
 
 -- =============================================================================
 -- All Examples Pass!

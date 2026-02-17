@@ -67,5 +67,5 @@ def myAdd := [Meirei|
   }
 ]
 
-#check myAdd  -- Int → Int → Int
-#eval myAdd 5 3  -- 8
+#check myAdd
+#guard myAdd 5 3 == 8

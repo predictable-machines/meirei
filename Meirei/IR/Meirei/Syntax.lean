@@ -35,6 +35,7 @@ syntax:70 imp_expr:70 "/" imp_expr:71 : imp_expr                      -- Divisio
 syntax:70 imp_expr:70 "%" imp_expr:71 : imp_expr                      -- Modulo
 syntax:65 imp_expr:65 "+" imp_expr:66 : imp_expr                      -- Addition
 syntax:65 imp_expr:65 "-" imp_expr:66 : imp_expr                      -- Subtraction
+syntax:65 imp_expr:65 "++" imp_expr:66 : imp_expr                     -- String concatenation
 syntax:50 imp_expr:50 ">" imp_expr:51 : imp_expr                      -- Greater than
 syntax:50 imp_expr:50 "<" imp_expr:51 : imp_expr                      -- Less than
 syntax:50 imp_expr:50 ">=" imp_expr:51 : imp_expr                     -- Greater than or equal
@@ -48,7 +49,7 @@ syntax:30 imp_expr:30 "||" imp_expr:31 : imp_expr                     -- Logical
 declare_syntax_cat imp_arg
 syntax imp_expr : imp_arg
 syntax:max str : imp_arg
-syntax ident "(" imp_arg,* ")" : imp_expr                  -- Function calls
+syntax ident ("." ident)* "(" imp_arg,* ")" : imp_expr      -- Function calls (qualified names allowed)
 syntax "(" imp_expr ")" : imp_expr                         -- Parenthesized expressions
 syntax imp_expr "." ident : imp_expr                       -- Field access
 
@@ -57,8 +58,8 @@ declare_syntax_cat imp_stmt
 syntax "return" imp_expr ";" : imp_stmt                    -- Return statement
 syntax "var" ident ":" imp_type "=" imp_expr ";" : imp_stmt -- Variable declaration
 syntax ident "=" imp_expr ";" : imp_stmt                   -- Assignment
-syntax ident "(" imp_arg,* ")" ";" : imp_stmt              -- Function call statement (effectful, no result)
-syntax ident "<-" ident "(" imp_arg,* ")" ";" : imp_stmt   -- Effectful call with result binding
+syntax ident ("." ident)* "(" imp_arg,* ")" ";" : imp_stmt              -- Function call statement (effectful, no result)
+syntax ident "<-" ident ("." ident)* "(" imp_arg,* ")" ";" : imp_stmt   -- Effectful call with result binding
 syntax "for" ident "in" imp_expr "{" imp_stmt* "}" : imp_stmt -- For loop
 syntax "if" "(" imp_expr ")" "{" imp_stmt* "}" : imp_stmt  -- If statement
 syntax "if" "(" imp_expr ")" "{" imp_stmt* "}" "else" "{" imp_stmt* "}" : imp_stmt  -- If-else statement

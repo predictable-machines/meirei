@@ -18,11 +18,10 @@ def intSum := [Meirei|
   }
 ]
 
-#check intSum  -- intSum : Int → Int → Int
+#check intSum
 
--- Test intSum
-#eval intSum 5 3  -- 8
-#eval intSum 10 (-3)  -- 7
+#guard intSum 5 3 == 8
+#guard intSum 10 (-3) == 7
 
 -- Example 2: mySum - Function with loop converted to fold
 -- Input:  def mySum(l: [Int]): Int { var out: Int = 0; for i in l { out = intSum(out, i); } return out; }
@@ -37,12 +36,11 @@ def mySum := [Meirei|
   }
 ]
 
-#check mySum  -- mySum : List Int → Int
+#check mySum
 
--- Test mySum
-#eval mySum [1, 2, 3, 4, 5]  -- 15
-#eval mySum []  -- 0
-#eval mySum [10, 20, 30]  -- 60
+#guard mySum [1, 2, 3, 4, 5] == 15
+#guard mySum [] == 0
+#guard mySum [10, 20, 30] == 60
 
 -- Example 3: multiply - Another pure function
 def multiply := [Meirei|
@@ -51,9 +49,9 @@ def multiply := [Meirei|
   }
 ]
 
-#check multiply  -- multiply : Int → Int → Int
-#eval multiply 6 7  -- 42
-#eval multiply 12 (-2)  -- -24
+#check multiply
+#guard multiply 6 7 == 42
+#guard multiply 12 (-2) == -24
 
 -- Example 4: increment - Single parameter function
 def increment := [Meirei|
@@ -62,9 +60,9 @@ def increment := [Meirei|
   }
 ]
 
-#check increment  -- increment : Int → Int
-#eval increment 41  -- 42
-#eval increment 0  -- 1
+#check increment
+#guard increment 41 == 42
+#guard increment 0 == 1
 
 -- Example 5: productSum - Using multiply with a loop
 def productSum := [Meirei|
@@ -77,8 +75,8 @@ def productSum := [Meirei|
   }
 ]
 
-#check productSum  -- productSum : List Int → Int
-#eval productSum [2, 3, 4]  -- 0 (because it starts from 0 * 2 * 3 * 4 = 0)
+#check productSum
+#guard productSum [2, 3, 4] == 0  -- starts from 0 * 2 * 3 * 4
 
 -- Let's show that the imperative syntax gets expanded to readable Lean code
 #print intSum

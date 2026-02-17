@@ -24,7 +24,7 @@ def varReturn := [Meirei|
   }
 ]
 
-#eval varReturn  -- "hello"
+#guard varReturn == "hello"
 
 def varReturnInt := [Meirei|
   def varReturnInt(): Int {
@@ -33,7 +33,7 @@ def varReturnInt := [Meirei|
   }
 ]
 
-#eval varReturnInt  -- 42
+#guard varReturnInt == 42
 
 -- =============================================================================
 -- 2. Sequential var + assign + return
@@ -47,7 +47,7 @@ def varAssignReturn := [Meirei|
   }
 ]
 
-#eval varAssignReturn  -- "world"
+#guard varAssignReturn == "world"
 
 def varAssignReturnInt := [Meirei|
   def varAssignReturnInt(): Int {
@@ -57,7 +57,7 @@ def varAssignReturnInt := [Meirei|
   }
 ]
 
-#eval varAssignReturnInt  -- 99
+#guard varAssignReturnInt == 99
 
 -- =============================================================================
 -- 3. Multiple sequential assignments
@@ -72,7 +72,7 @@ def varMultiAssign := [Meirei|
   }
 ]
 
-#eval varMultiAssign  -- 3
+#guard varMultiAssign == 3
 
 -- =============================================================================
 -- 4. If/else var propagation (Bug 2)
@@ -90,9 +90,9 @@ def varIfElse := [Meirei|
   }
 ]
 
-#eval varIfElse 1  -- "one"
-#eval varIfElse 0  -- "other"
-#eval varIfElse 2  -- "other"
+#guard varIfElse 1 == "one"
+#guard varIfElse 0 == "other"
+#guard varIfElse 2 == "other"
 
 def varIfElseInt := [Meirei|
   def varIfElseInt(flag: Int): Int {
@@ -106,8 +106,8 @@ def varIfElseInt := [Meirei|
   }
 ]
 
-#eval varIfElseInt 1  -- 100
-#eval varIfElseInt 0  -- 200
+#guard varIfElseInt 1 == 100
+#guard varIfElseInt 0 == 200
 
 -- =============================================================================
 -- 5. If-then (no else) var propagation
@@ -123,8 +123,8 @@ def varIfThen := [Meirei|
   }
 ]
 
-#eval varIfThen 1  -- "changed"
-#eval varIfThen 0  -- "default"
+#guard varIfThen 1 == "changed"
+#guard varIfThen 0 == "default"
 
 -- =============================================================================
 -- 6. Var + if/else still works inside loops (regression check)
@@ -144,9 +144,9 @@ def varInLoop := [Meirei|
   }
 ]
 
-#eval varInLoop []         -- 0
-#eval varInLoop [1, 2, 3]  -- 6
-#eval varInLoop [1, -1, 2] -- 3
+#guard varInLoop [] == 0
+#guard varInLoop [1, 2, 3] == 6
+#guard varInLoop [1, -1, 2] == 3
 
 -- =============================================================================
 -- 7. Var init + loop (existing behaviour preserved)
@@ -162,7 +162,7 @@ def varInitLoop := [Meirei|
   }
 ]
 
-#eval varInitLoop []   -- "empty"
-#eval varInitLoop [1]  -- "notempty"
+#guard varInitLoop [] == "empty"
+#guard varInitLoop [1] == "notempty"
 
 end MutabilityTests

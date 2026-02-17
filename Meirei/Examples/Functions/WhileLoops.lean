@@ -30,11 +30,11 @@ partial def nextPow2 := [Meirei|
 #meirei_print nextPow2
 #print nextPow2
 #check nextPow2
-#eval nextPow2 1    -- 1
-#eval nextPow2 5    -- 8
-#eval nextPow2 16   -- 16
-#eval nextPow2 17   -- 32
-#eval nextPow2 100  -- 128
+#guard nextPow2 1 == 1
+#guard nextPow2 5 == 8
+#guard nextPow2 16 == 16
+#guard nextPow2 17 == 32
+#guard nextPow2 100 == 128
 
 -- mod helper for GCD
 def mod (a b : Int) : Int := a % b
@@ -55,10 +55,10 @@ partial def gcd := [Meirei|
 
 #meirei_print gcd
 #check gcd
-#eval gcd 48 18    -- 6
-#eval gcd 100 75   -- 25
-#eval gcd 17 5     -- 1
-#eval gcd 0 5      -- 5
+#guard gcd 48 18 == 6
+#guard gcd 100 75 == 25
+#guard gcd 17 5 == 1
+#guard gcd 0 5 == 5
 
 -- Example 3: Count digits (single variable with function call in body)
 partial def countDigits := [Meirei|
@@ -74,10 +74,10 @@ partial def countDigits := [Meirei|
 ]
 
 #check countDigits
-#eval countDigits 0      -- 0
-#eval countDigits 5      -- 1
-#eval countDigits 42     -- 2
-#eval countDigits 12345  -- 5
+#guard countDigits 0 == 0
+#guard countDigits 5 == 1
+#guard countDigits 42 == 2
+#guard countDigits 12345 == 5
 
 -- =============================================================================
 -- While loops with termination proofs (decreasing annotation)
@@ -97,9 +97,9 @@ def countdown := [Meirei|
 
 #meirei_print countdown
 #check countdown
-#eval countdown 10   -- 0
-#eval countdown 0    -- 0
-#eval countdown 5    -- 0
+#guard countdown 10 == 0
+#guard countdown 0 == 0
+#guard countdown 5 == 0
 
 -- Example 5: Triangular number with termination proof (two variables)
 -- x strictly decreases by 1 each iteration; Lean proves this automatically.
@@ -117,10 +117,10 @@ def triangular := [Meirei|
 
 #meirei_print triangular
 #check triangular
-#eval triangular 5    -- 15 (5+4+3+2+1)
-#eval triangular 10   -- 55
-#eval triangular 0    -- 0
-#eval triangular 1    -- 1
+#guard triangular 5 == 15
+#guard triangular 10 == 55
+#guard triangular 0 == 0
+#guard triangular 1 == 1
 
 -- The following would correctly error:
 --   while (typo_var < 10) { }           → "while loop body does not modify any variables"

@@ -27,9 +27,9 @@ def safeDivide := [Meirei|
   }
 ]
 
-#check safeDivide              -- Int → Int → Option Int
-#eval safeDivide 10 3          -- some 3
-#eval safeDivide 10 0          -- none
+#check safeDivide
+#guard safeDivide 10 3 == some 3
+#guard safeDivide 10 0 == none
 
 -- =============================================================================
 -- Option in Struct Fields
@@ -37,8 +37,8 @@ def safeDivide := [Meirei|
 
 meirei_type struct PersonRecord { age: Int, score: Int? }
 
-#check PersonRecord            -- Type
-#check PersonRecord.mk         -- Int → Option Int → PersonRecord
+#check PersonRecord
+#check PersonRecord.mk
 
 -- =============================================================================
 -- Pattern Matching on Option Parameters
@@ -53,9 +53,9 @@ def getOrZero := [Meirei|
   }
 ]
 
-#check getOrZero                          -- Option Int → Int
-#eval getOrZero Option.none               -- 0
-#eval getOrZero (Option.some 42)          -- 42
+#check getOrZero
+#guard getOrZero Option.none == 0
+#guard getOrZero (Option.some 42) == 42
 
 -- =============================================================================
 -- AST Representation

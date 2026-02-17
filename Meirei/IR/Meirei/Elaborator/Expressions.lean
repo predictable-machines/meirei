@@ -17,6 +17,32 @@ namespace Meirei.Elaborator
 open Meirei.AST
 
 -- =============================================================================
+-- Qualified Name Detection
+-- =============================================================================
+
+/-- Walk a chain of fieldAccess nodes back to the root. Returns the base var
+    name and the list of field names (in order) if the chain is rooted in a
+    `MeireiExpr.var`; otherwise returns `none`. -/
+private def collectFieldChain : MeireiExpr → List Name → Option (Name × List Name)
+  | MeireiExpr.fieldAccess inner field, acc => collectFieldChain inner (field :: acc)
+  | MeireiExpr.var base, acc => some (base, acc)
+  | _, _ => none
+
+/-- Build a qualified Lean.Name from a base name and a list of field names. -/
+private def buildQualName (base : Name) (fields : List Name) : Name :=
+  fields.foldl (· ++ ·) base
+
+/-- Check whether a name looks like a qualified Lean namespace/type reference
+    (starts with an uppercase letter) rather than a local variable. This mirrors
+    Lean's own convention: types and namespaces are uppercase, variables are
+    lowercase. We use this instead of checking `ctx.vars` because not all locals
+    are tracked there (e.g. loop iterator variables are bound as fold parameters). -/
+private def isQualifiedPrefix (name : Name) : Bool :=
+  match name.toString.toList.head? with
+  | some c => c.isUpper
+  | none => false
+
+-- =============================================================================
 -- Expression Elaboration
 -- =============================================================================
 
@@ -63,8 +89,9 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
     | BinOp.le  => `($lhs' <= $rhs')
     | BinOp.eq  => `($lhs' == $rhs')
     | BinOp.ne  => `($lhs' != $rhs')
-    | BinOp.and_ => `($lhs' && $rhs')
-    | BinOp.or_  => `($lhs' || $rhs')
+    | BinOp.and_    => `($lhs' && $rhs')
+    | BinOp.or_     => `($lhs' || $rhs')
+    | BinOp.append  => `($lhs' ++ $rhs')
 
   | MeireiExpr.unaryOp op operand => do
     let operand' ← elabExpr operand
@@ -79,9 +106,20 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
     return result
 
   | MeireiExpr.fieldAccess obj fieldName => do
-    let objTerm ← elabExpr obj
-    let fieldIdent := mkIdent fieldName
-    `($objTerm.$fieldIdent:ident)
+    -- If the chain is rooted in a non-local identifier, treat as a qualified
+    -- Lean name (e.g. `Nat.zero`) rather than field projection.
+    match collectFieldChain obj [fieldName] with
+    | some (base, fields) =>
+      if isQualifiedPrefix base then
+        return mkIdent (buildQualName base fields)
+      else
+        let objTerm ← elabExpr obj
+        let fieldIdent := mkIdent fieldName
+        `($objTerm.$fieldIdent:ident)
+    | none =>
+      let objTerm ← elabExpr obj
+      let fieldIdent := mkIdent fieldName
+      `($objTerm.$fieldIdent:ident)
 
 -- =============================================================================
 -- Condition Validation
@@ -135,8 +173,9 @@ partial def substituteVarInExpr (expr : MeireiExpr) (varName : Name) (replacemen
     | BinOp.le  => `($lhs' <= $rhs')
     | BinOp.eq  => `($lhs' == $rhs')
     | BinOp.ne  => `($lhs' != $rhs')
-    | BinOp.and_ => `($lhs' && $rhs')
-    | BinOp.or_  => `($lhs' || $rhs')
+    | BinOp.and_    => `($lhs' && $rhs')
+    | BinOp.or_     => `($lhs' || $rhs')
+    | BinOp.append  => `($lhs' ++ $rhs')
   | MeireiExpr.unaryOp op operand => do
     let operand' ← substituteVarInExpr operand varName replacement
     match op with
@@ -158,8 +197,17 @@ partial def substituteVarInExpr (expr : MeireiExpr) (varName : Name) (replacemen
       result ← `($result $arg)
     return result
   | MeireiExpr.fieldAccess obj fieldName => do
-    let objTerm ← substituteVarInExpr obj varName replacement
-    let fieldIdent := mkIdent fieldName
-    `($objTerm.$fieldIdent:ident)
+    match collectFieldChain obj [fieldName] with
+    | some (base, fields) =>
+      if isQualifiedPrefix base then
+        return mkIdent (buildQualName base fields)
+      else
+        let objTerm ← substituteVarInExpr obj varName replacement
+        let fieldIdent := mkIdent fieldName
+        `($objTerm.$fieldIdent:ident)
+    | none =>
+      let objTerm ← substituteVarInExpr obj varName replacement
+      let fieldIdent := mkIdent fieldName
+      `($objTerm.$fieldIdent:ident)
 
 end Meirei.Elaborator

@@ -15,3 +15,5 @@ import PredictableVerification.Examples.Functions.WorkingComplexExamples
 import PredictableVerification.Examples.Functions.ComparisonAndLogic
 import PredictableVerification.Examples.Functions.ExceptAndThrow
 import PredictableVerification.Examples.Functions.OperatorPrecedence
+import PredictableVerification.Examples.Functions.QualifiedNames
+import PredictableVerification.Examples.Functions.StringConcat

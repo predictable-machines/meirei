@@ -47,13 +47,13 @@ def findFirstGreaterThan10 := [Meirei|
   }
 ]
 
-#check findFirstGreaterThan10  -- findFirstGreaterThan10 : List Int → Int
+#check findFirstGreaterThan10
 #print findFirstGreaterThan10
--- Test cases
-#eval findFirstGreaterThan10 [1, 5, 3, 15, 20]  -- Should be 15 (first > 10)
-#eval findFirstGreaterThan10 [1, 2, 3]          -- Should be 0 (none > 10)
-#eval findFirstGreaterThan10 [20, 30, 5]        -- Should be 20 (first element)
-#eval findFirstGreaterThan10 []                 -- Should be 0 (empty list)
+
+#guard findFirstGreaterThan10 [1, 5, 3, 15, 20] == 15
+#guard findFirstGreaterThan10 [1, 2, 3] == 0
+#guard findFirstGreaterThan10 [20, 30, 5] == 20
+#guard findFirstGreaterThan10 [] == 0
 
 -- Show the generated code
 #print findFirstGreaterThan10
@@ -107,13 +107,12 @@ def sumUntilLarge := [Meirei|
   }
 ]
 
-#check sumUntilLarge  -- sumUntilLarge : List Int → Int
+#check sumUntilLarge
 
--- Test cases
-#eval sumUntilLarge [1, 2, 3, 4, 5]       -- Should be 15 (sum all)
-#eval sumUntilLarge [10, 20, 200, 30]     -- Should be 30 (stop at 200)
-#eval sumUntilLarge [150, 1, 2]           -- Should be 0 (stop immediately)
-#eval sumUntilLarge []                    -- Should be 0 (empty)
+#guard sumUntilLarge [1, 2, 3, 4, 5] == 15
+#guard sumUntilLarge [10, 20, 200, 30] == 30
+#guard sumUntilLarge [150, 1, 2] == 0
+#guard sumUntilLarge [] == 0
 
 -- Show the generated code
 #print sumUntilLarge
@@ -152,13 +151,12 @@ def findFirstSmall := [Meirei|
 ]
 
 #check findFirstSmall
-#print findFirstSmall -- findFirstSmall : List Int → Int
+#print findFirstSmall
 
--- Test cases
-#eval findFirstSmall [10, 20, 3, 8, 1]  -- Should be 3 (first < 5)
-#eval findFirstSmall [10, 20, 30]       -- Should be 100 (not found)
-#eval findFirstSmall [2, 1]             -- Should be 2 (first element)
-#eval findFirstSmall []                 -- Should be 100 (empty)
+#guard findFirstSmall [10, 20, 3, 8, 1] == 3
+#guard findFirstSmall [10, 20, 30] == 100
+#guard findFirstSmall [2, 1] == 2
+#guard findFirstSmall [] == 100
 
 
 -- =============================================================================
@@ -214,5 +212,4 @@ def findFirstSmall := [Meirei|
   from verification_platform_fundamentals.md).
 -/
 
--- Test the with-early-exit version
-#eval sumUntilLarge [1, 2, 3, 200, 4, 5]  -- 6 (stops at 200)
+#guard sumUntilLarge [1, 2, 3, 200, 4, 5] == 6

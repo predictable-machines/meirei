@@ -30,16 +30,15 @@ def fib := [Meirei|
   }
 ]
 
-#check fib  -- fib : Int → Int (or Int → Nat depending on elaboration)
-#print fib   -- Show the elaborated form
+#check fib
+#print fib
 
--- Test iterative Fibonacci
-#eval fib 0   -- 0
-#eval fib 1   -- 1
-#eval fib 2   -- 1
-#eval fib 3   -- 2
-#eval fib 4   -- 3
-#eval fib 5   -- 5
-#eval fib 6   -- 8
-#eval fib 7   -- 13
-#eval fib 10  -- 55
+#guard fib 0 == 0
+#guard fib 1 == 1
+#guard fib 2 == 1
+#guard fib 3 == 2
+#guard fib 4 == 3
+#guard fib 5 == 5
+#guard fib 6 == 8
+#guard fib 7 == 13
+#guard fib 10 == 55

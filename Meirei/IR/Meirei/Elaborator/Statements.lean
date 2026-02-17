@@ -152,7 +152,9 @@ partial def elabBreakLoopBody (body : List MeireiStmt) (varName : Name) (stateId
       if breakBody.length == 1 then
         match breakBody[0]! with
         | MeireiStmt.break_ => do
-          let condTerm ← elabExpr breakCond
+          -- substituteVarInExpr so condition checks state_0.2 (current value),
+          -- not the outer let binding (initial value)
+          let condTerm ← substituteVarInExpr breakCond varName currentValue
           let updateExpr ← elabBreakUpdateExpr rhs varName currentValue
           `(if $condTerm then (Bool.false, $currentValue) else (Bool.true, $updateExpr))
         | _ =>
@@ -166,7 +168,7 @@ partial def elabBreakLoopBody (body : List MeireiStmt) (varName : Name) (stateId
       if breakBody.length == 1 && updateBody.length == 1 then
         match breakBody[0]!, updateBody[0]! with
         | MeireiStmt.break_, MeireiStmt.assign _ rhs => do
-          let breakCondTerm ← elabExpr breakCond
+          let breakCondTerm ← substituteVarInExpr breakCond varName currentValue
           let updateCondTerm ← substituteVarInExpr updateCond varName currentValue
           let updateExpr ← elabExpr rhs
           `(if $breakCondTerm then (Bool.false, $currentValue)
@@ -187,8 +189,8 @@ partial def elabBreakLoopBody (body : List MeireiStmt) (varName : Name) (stateId
       if hasBreakInThen && hasBreakInElse then
         match elseBody[0]! with
         | MeireiStmt.ifThen elseCond _ => do
-          let condTerm ← elabExpr cond
-          let elseCondTerm ← elabExpr elseCond
+          let condTerm ← substituteVarInExpr cond varName currentValue
+          let elseCondTerm ← substituteVarInExpr elseCond varName currentValue
           let updateExpr ← elabBreakUpdateExpr rhs varName currentValue
           `(if $condTerm then (Bool.false, $currentValue)
             else if $elseCondTerm then (Bool.false, $currentValue)
@@ -727,10 +729,25 @@ partial def elabExceptTupleFold
   let loopVarIdent := mkIdent (loopVarName.appendAfter "_0")
   let initTuple ← buildTupleFromTerms initTerms
 
-  -- Fold: short-circuit on error, destructure ok tuple for body
+  -- Fold: short-circuit on error, destructure ok tuple for body.
+  -- We match the ok payload into an intermediate `_okVal` ident, then
+  -- destructure with .1/.2 projections. Splicing a tuple *term* pattern
+  -- directly into `Except.ok $pat` confuses Lean's pattern elaborator and
+  -- strips the Except wrapping entirely.
+  let okIdent := mkIdent `_okVal
+  let mut wrappedBody := bodyExpr
+  for i in [:statePattern.size] do
+    let idx := statePattern.size - 1 - i
+    let ident := statePattern[idx]!
+    if idx == 0 then
+      wrappedBody ← `(let $ident := $okIdent.1; $wrappedBody)
+    else if idx == 1 then
+      wrappedBody ← `(let $ident := $okIdent.2; $wrappedBody)
+    else
+      Macro.throwError "Except tuple fold with more than 2 variables not yet supported"
   let matchBody ← `(match ($accIdent) with
     | Except.error e => Except.error e
-    | Except.ok $statePatternTuple => $bodyExpr)
+    | Except.ok $okIdent => $wrappedBody)
   let foldExpr ← `(List.foldl (fun $accIdent $loopVarIdent => $matchBody) (Except.ok $initTuple) $collTerm)
 
   -- Update all variable versions for post-loop continuation
