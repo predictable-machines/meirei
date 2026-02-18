@@ -63,6 +63,11 @@ partial def elabExpr (expr : MeireiExpr) : ElabM Term := do
   | MeireiExpr.stringLit s =>
     return Lean.Syntax.mkStrLit s
 
+  | MeireiExpr.listLit elems => do
+    let elems' ← elems.mapM elabExpr
+    let elemsArr := elems'.toArray
+    `([ $[$elemsArr],* ])
+
   | MeireiExpr.var name => do
     let ctx ← get
     match ctx.vars[name]? with
@@ -144,6 +149,9 @@ partial def validateConditionVars (expr : MeireiExpr) : ElabM Unit := do
       validateConditionVars arg
   | MeireiExpr.fieldAccess obj _ =>
     validateConditionVars obj
+  | MeireiExpr.listLit elems =>
+    for elem in elems do
+      validateConditionVars elem
   | MeireiExpr.intLit _ | MeireiExpr.boolLit _ | MeireiExpr.stringLit _ => pure ()
 
 -- =============================================================================
@@ -190,6 +198,10 @@ partial def substituteVarInExpr (expr : MeireiExpr) (varName : Name) (replacemen
     if b then `(true) else `(false)
   | MeireiExpr.stringLit s =>
     return Lean.Syntax.mkStrLit s
+  | MeireiExpr.listLit elems => do
+    let elems' ← elems.mapM (substituteVarInExpr · varName replacement)
+    let elemsArr := elems'.toArray
+    `([ $[$elemsArr],* ])
   | MeireiExpr.call name args => do
     let args' ← args.mapM (substituteVarInExpr · varName replacement)
     let mut result ← `($(mkIdent name))

@@ -15,6 +15,20 @@ namespace Meirei.Parser
 
 open Meirei.AST
 
+/-- Extract the base Name from an imp_ident syntax (handles ident, ident?, and ident! forms).
+    Returns the full name including the suffix (e.g., `isEmpty?` as a single Name). -/
+def getImpIdentName (stx : TSyntax `imp_ident) : Name :=
+  match stx with
+  | `(imp_ident| $x:ident) => x.getId
+  | `(imp_ident| $x:ident ?) => (x.getId.toString ++ "?").toName
+  | `(imp_ident| $x:ident !) => (x.getId.toString ++ "!").toName
+  | _ => Name.anonymous  -- Fallback (should not happen with well-formed syntax)
+
+/-- Build a hierarchical Lean.Name from a base imp_ident and dotted parts.
+    e.g. `isEmpty` + `?` → `isEmpty?`, then `List` + `isEmpty?` → `List.isEmpty?` -/
+private def buildQualifiedNameFromImpIdent (base : TSyntax `imp_ident) (parts : Array (TSyntax `imp_ident)) : Name :=
+  parts.foldl (fun acc part => acc ++ getImpIdentName part) (getImpIdentName base)
+
 /-- Resolve a type name that may have trailing `?` characters (e.g. `Int?`, `Shape??`).
     The tokenizer merges `T?` into a single ident, so we strip trailing `?` here.
     Type names must start with an uppercase letter. -/
@@ -70,11 +84,6 @@ private def extractStrLit (stx : Syntax) : Option String :=
       alt.isStrLit? <|> alt[0]?.bind (·.isStrLit?)
   else none)
 
-/-- Build a hierarchical Lean.Name from a base identifier and dotted parts.
-    e.g. `String` + `[append]` → `String.append` -/
-private def buildQualifiedName (base : TSyntax `ident) (parts : Array (TSyntax `ident)) : Name :=
-  parts.foldl (fun acc part => acc ++ part.getId) base.getId
-
 /-- Decompose a hierarchical Lean.Name into its string components.
     Lean's tokenizer merges dotted identifiers (e.g. `p.fst`) into a single
     ident token, so we split them here for the parser to distinguish field
@@ -105,13 +114,13 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
   | `(imp_expr| - $n:num) =>
     return MeireiExpr.intLit (- n.getNat)
 
-  | `(imp_expr| $x:ident) =>
-    let name := x.getId
+  | `(imp_expr| $x:imp_ident) =>
+    let name := getImpIdentName x
     if name == `true then return MeireiExpr.boolLit true
     else if name == `false then return MeireiExpr.boolLit false
     else
       -- Lean's tokenizer merges dotted names (e.g. `p.fst`) into a single
-      -- ident token, bypassing the `imp_expr "." ident` syntax rule.
+      -- ident token, bypassing the `imp_expr "." imp_ident` syntax rule.
       -- Decompose multi-component names into a fieldAccess chain so the
       -- elaborator can properly version variables (e.g. `p` → `p_0` in loops).
       match nameComponents name with
@@ -196,16 +205,20 @@ partial def parseExpr (stx : TSyntax `imp_expr) : MacroM MeireiExpr := do
     let a' ← parseExpr a
     return MeireiExpr.unaryOp UnaryOp.not_ a'
 
-  | `(imp_expr| $f:ident $[. $parts:ident]* ( $args,* )) => do
+  | `(imp_expr| $f:imp_ident $[. $parts:imp_ident]* ( $args,* )) => do
     let args' ← args.getElems.toList.mapM parseArg
-    return MeireiExpr.call (buildQualifiedName f parts) args'
+    return MeireiExpr.call (buildQualifiedNameFromImpIdent f parts) args'
 
   | `(imp_expr| ( $e:imp_expr )) =>
     parseExpr e
 
-  | `(imp_expr| $obj:imp_expr . $field:ident) => do
+  | `(imp_expr| $obj:imp_expr . $field:imp_ident) => do
     let obj' ← parseExpr obj
-    return MeireiExpr.fieldAccess obj' field.getId
+    return MeireiExpr.fieldAccess obj' (getImpIdentName field)
+
+  | `(imp_expr| [ $elems,* ]) => do
+    let elems' ← elems.getElems.toList.mapM parseExpr
+    return MeireiExpr.listLit elems'
 
   | other =>
     -- `syntax:max str : imp_expr` wraps the strLit in an imp_expr node.
@@ -231,9 +244,9 @@ partial def parseStmt (stx : TSyntax `imp_stmt) : MacroM MeireiStmt := do
     let init' ← parseExpr init
     return MeireiStmt.varDecl x.getId ty' init'
 
-  | `(imp_stmt| $x:ident = $rhs:imp_expr ;) => do
+  | `(imp_stmt| $x:imp_ident = $rhs:imp_expr ;) => do
     let rhs' ← parseExpr rhs
-    return MeireiStmt.assign x.getId rhs'
+    return MeireiStmt.assign (getImpIdentName x) rhs'
 
   | `(imp_stmt| return $e:imp_expr ;) => do
     let e' ← parseExpr e
@@ -274,13 +287,13 @@ partial def parseStmt (stx : TSyntax `imp_stmt) : MacroM MeireiStmt := do
     let stmts' ← stmts.toList.mapM parseStmt
     return MeireiStmt.block stmts'
 
-  | `(imp_stmt| $f:ident $[. $parts:ident]* ( $args,* ) ;) => do
+  | `(imp_stmt| $f:imp_ident $[. $parts:imp_ident]* ( $args,* ) ;) => do
     let args' ← args.getElems.toList.mapM parseArg
-    return MeireiStmt.effectCall (buildQualifiedName f parts) args'
+    return MeireiStmt.effectCall (buildQualifiedNameFromImpIdent f parts) args'
 
-  | `(imp_stmt| $y:ident <- $f:ident $[. $parts:ident]* ( $args,* ) ;) => do
+  | `(imp_stmt| $y:ident <- $f:imp_ident $[. $parts:imp_ident]* ( $args,* ) ;) => do
     let args' ← args.getElems.toList.mapM parseArg
-    return MeireiStmt.effectBind y.getId (buildQualifiedName f parts) args'
+    return MeireiStmt.effectBind y.getId (buildQualifiedNameFromImpIdent f parts) args'
 
   | `(imp_stmt| match $scrutinee:imp_expr { $arms* }) => do
     let scrutinee' ← parseExpr scrutinee
@@ -302,12 +315,12 @@ def parseParam (stx : TSyntax `imp_param) : MacroM MeireiParam := do
 /-- Parse a function definition syntax to MeireiFunDef -/
 def parseFunDef (stx : TSyntax `imp_fundef) : MacroM MeireiFunDef := do
   match stx with
-  | `(imp_fundef| def $name:ident ( $params,* ) : $retTy:imp_type { $stmts* }) => do
+  | `(imp_fundef| def $name:imp_ident ( $params,* ) : $retTy:imp_type { $stmts* }) => do
     let params' ← params.getElems.toList.mapM parseParam
     let retTy' ← parseType retTy
     let body' ← stmts.toList.mapM parseStmt
     return {
-      name := name.getId,
+      name := getImpIdentName name,
       params := params',
       returnType := retTy',
       body := body'

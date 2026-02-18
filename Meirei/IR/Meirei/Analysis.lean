@@ -147,6 +147,7 @@ partial def collectExprVars (expr : MeireiExpr) : List Name :=
   | MeireiExpr.intLit _ => []
   | MeireiExpr.boolLit _ => []
   | MeireiExpr.stringLit _ => []
+  | MeireiExpr.listLit elems => collectExprVarsInList elems
   | MeireiExpr.binOp _ lhs rhs => collectExprVars lhs ++ collectExprVars rhs
   | MeireiExpr.unaryOp _ operand => collectExprVars operand
   | MeireiExpr.call _ args => collectExprVarsInList args

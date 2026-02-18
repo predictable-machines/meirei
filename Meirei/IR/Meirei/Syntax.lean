@@ -7,6 +7,13 @@
 
 namespace Meirei
 
+-- Custom identifier syntax that supports ? and ! suffixes (matching Lean's identifier rules)
+-- These must be atomic to prevent whitespace between the base identifier and suffix
+declare_syntax_cat imp_ident
+syntax ident : imp_ident                    -- Base identifier
+syntax atomic(ident "?") : imp_ident       -- Identifier with ? suffix
+syntax atomic(ident "!") : imp_ident       -- Identifier with ! suffix
+
 -- Type syntax: all types start with uppercase identifiers.
 -- Lowercase identifiers are reserved for functions and type constructors.
 declare_syntax_cat imp_type
@@ -17,7 +24,7 @@ syntax imp_type "?" : imp_type      -- Option sugar: T? → Option T
 
 -- Expression syntax
 declare_syntax_cat imp_expr
-syntax ident : imp_expr                                    -- Variables
+syntax imp_ident : imp_expr                                -- Variables (supports ? and ! suffixes)
 syntax num : imp_expr                                      -- Numbers
 syntax "-" num : imp_expr                                  -- Negative numbers
 syntax:max str : imp_expr                                  -- String literals
@@ -49,17 +56,18 @@ syntax:30 imp_expr:30 "||" imp_expr:31 : imp_expr                     -- Logical
 declare_syntax_cat imp_arg
 syntax imp_expr : imp_arg
 syntax:max str : imp_arg
-syntax ident ("." ident)* "(" imp_arg,* ")" : imp_expr      -- Function calls (qualified names allowed)
+syntax imp_ident ("." imp_ident)* "(" imp_arg,* ")" : imp_expr      -- Function calls (qualified names with ? and ! support)
 syntax "(" imp_expr ")" : imp_expr                         -- Parenthesized expressions
-syntax imp_expr "." ident : imp_expr                       -- Field access
+syntax imp_expr "." imp_ident : imp_expr                   -- Field access (supports ? and ! suffixes)
+syntax "[" imp_expr,* "]" : imp_expr                       -- List literal
 
 -- Statement syntax
 declare_syntax_cat imp_stmt
 syntax "return" imp_expr ";" : imp_stmt                    -- Return statement
-syntax "var" ident ":" imp_type "=" imp_expr ";" : imp_stmt -- Variable declaration
-syntax ident "=" imp_expr ";" : imp_stmt                   -- Assignment
-syntax ident ("." ident)* "(" imp_arg,* ")" ";" : imp_stmt              -- Function call statement (effectful, no result)
-syntax ident "<-" ident ("." ident)* "(" imp_arg,* ")" ";" : imp_stmt   -- Effectful call with result binding
+syntax "var" ident ":" imp_type "=" imp_expr ";" : imp_stmt -- Variable declaration (new bindings use plain ident)
+syntax imp_ident "=" imp_expr ";" : imp_stmt               -- Assignment (references existing variable)
+syntax imp_ident ("." imp_ident)* "(" imp_arg,* ")" ";" : imp_stmt              -- Function call statement (supports ? and !)
+syntax ident "<-" imp_ident ("." imp_ident)* "(" imp_arg,* ")" ";" : imp_stmt   -- Effectful call with result binding
 syntax "for" ident "in" imp_expr "{" imp_stmt* "}" : imp_stmt -- For loop
 syntax "if" "(" imp_expr ")" "{" imp_stmt* "}" : imp_stmt  -- If statement
 syntax "if" "(" imp_expr ")" "{" imp_stmt* "}" "else" "{" imp_stmt* "}" : imp_stmt  -- If-else statement
@@ -80,7 +88,7 @@ syntax ident ":" imp_type : imp_param
 
 -- Function definition syntax
 declare_syntax_cat imp_fundef
-syntax "def" ident "(" imp_param,* ")" ":" imp_type "{" imp_stmt* "}" : imp_fundef
+syntax "def" imp_ident "(" imp_param,* ")" ":" imp_type "{" imp_stmt* "}" : imp_fundef  -- Function names can have ? or ! suffixes
 
 -- Term-level syntax that can be used as expressions
 syntax "[Meirei|" imp_fundef "]" : term

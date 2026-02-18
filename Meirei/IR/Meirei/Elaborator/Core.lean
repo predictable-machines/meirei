@@ -40,8 +40,9 @@ open Meirei.Elaborator Meirei.Parser Meirei
     can pretty-print the generated syntax and store it for #meirei_print. -/
 elab "[Meirei|" fundef:imp_fundef "]" : term => do
   let termStx ← liftMacroM (elabMeirei fundef)
-  -- imp_fundef syntax: "def" ident "(" params ")" ":" type "{" stmts "}"
-  let funcName := fundef.raw[1]!.getId
+  -- imp_fundef syntax: "def" imp_ident "(" params ")" ":" type "{" stmts "}"
+  -- fundef.raw[1] is the imp_ident syntax node, extract the Name using getImpIdentName
+  let funcName := Parser.getImpIdentName ⟨fundef.raw[1]!⟩
   let fmt ← Lean.PrettyPrinter.ppTerm termStx
   modifyEnv fun env => meireiCodeExt.addEntry env (funcName, toString fmt)
   Term.elabTerm termStx none

@@ -47,6 +47,7 @@ inductive MeireiExpr where
   | intLit : Int → MeireiExpr
   | boolLit : Bool → MeireiExpr
   | stringLit : String → MeireiExpr
+  | listLit : List MeireiExpr → MeireiExpr
   | binOp : BinOp → MeireiExpr → MeireiExpr → MeireiExpr
   | unaryOp : UnaryOp → MeireiExpr → MeireiExpr
   | call : Lean.Name → List MeireiExpr → MeireiExpr
