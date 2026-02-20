@@ -708,7 +708,6 @@ partial def elabExceptTupleFold
   let mut statePattern : Array Ident := #[]
   for (varName, _) in modifiedVars do
     statePattern := statePattern.push (mkIdent (varName.appendAfter "_0"))
-  let statePatternTuple ← buildPatternTuple statePattern
 
   -- Build fold context with all modified variables at version 0
   let mut foldCtx := savedCtx
