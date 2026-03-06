@@ -59,7 +59,10 @@ def TranslationAgent.create (config : TranslationAgentConfig := .default) : Tran
   { config := config, systemPrompt := systemPrompt }
 
 /-- Create with custom system prompt -/
-def TranslationAgent.createWithPrompt (prompt : String) (config : TranslationAgentConfig := .default) : TranslationAgent :=
+def TranslationAgent.createWithPrompt
+    (prompt : String)
+    (config : TranslationAgentConfig := .default)
+    : TranslationAgent :=
   { config := config, systemPrompt := prompt }
 
 /-- Translate source code to Meirei IR -/
@@ -97,40 +100,38 @@ def TranslationAgent.translate (agent : TranslationAgent) (request : Translation
 
   -- Call the LLM via FlowProviderAdapter using singleRequestStructured
   try
-    let (result, state) ←
-      Program.run
-        (adapter.singleRequestStructured
-          (α := LLMTranslationResponse)
-          agent.systemPrompt
-          userPrompt)
-        agentConfig
-        (default : PredictableState)
-
-    match result with
+    match ← adapter.singleRequestStructured
+        (α := LLMTranslationResponse)
+        agent.systemPrompt
+        userPrompt with
     | .error e =>
       if agent.config.verbose then
         IO.println s!"[TranslationAgent] Provider error: {e}"
       return .error (.llmError (toString e))
-    | .ok llmResponse =>
-      -- Build token usage from state (convert Int to Nat)
-      let inputToks := state.inputTokens.toNat
-      let outputToks := state.outputTokens.toNat
-      let tokenUsage : TokenUsage := {
-        inputTokens := inputToks
-        outputTokens := outputToks
-        totalTokens := inputToks + outputToks
-      }
+    | .ok flow =>
+      let result ← flow.awaitResult
+      let state ← flow.currentState
+      match result with
+      | none =>
+        return .error (.llmError "No response from LLM")
+      | some llmResponse =>
+        let agentMeta := state.metadata
+        let tokenUsage : TokenUsage := {
+          inputTokens := agentMeta.inputTokens
+          outputTokens := agentMeta.outputTokens
+          totalTokens := agentMeta.totalTokens
+        }
 
-      let translationResult := llmResponse.toTranslationResult tokenUsage agent.config.model none
+        let translationResult := llmResponse.toTranslationResult tokenUsage agent.config.model none
 
-      if agent.config.verbose then
-        IO.println s!"[TranslationAgent] Translation complete"
-        IO.println s!"[TranslationAgent] Output length: {translationResult.meireiCode.length} chars"
-        IO.println s!"[TranslationAgent] Confidence: {translationResult.confidence}"
-        IO.println s!"[TranslationAgent] Approximations: {translationResult.approximations.length}"
-        IO.println s!"[TranslationAgent] Tokens: {tokenUsage.totalTokens}"
+        if agent.config.verbose then
+          IO.println s!"[TranslationAgent] Translation complete"
+          IO.println s!"[TranslationAgent] Output length: {translationResult.meireiCode.length} chars"
+          IO.println s!"[TranslationAgent] Confidence: {translationResult.confidence}"
+          IO.println s!"[TranslationAgent] Approximations: {translationResult.approximations.length}"
+          IO.println s!"[TranslationAgent] Tokens: {tokenUsage.totalTokens}"
 
-      return .ok translationResult
+        return .ok translationResult
 
   catch e =>
     let errorMsg := toString e
@@ -142,7 +143,10 @@ def TranslationAgent.translate (agent : TranslationAgent) (request : Translation
       return .error (.llmError errorMsg)
 
 /-- Translate with retry logic -/
-def TranslationAgent.translateWithRetry (agent : TranslationAgent) (request : TranslationRequest) : IO TranslationOutcome := do
+def TranslationAgent.translateWithRetry
+    (agent : TranslationAgent)
+    (request : TranslationRequest)
+    : IO TranslationOutcome := do
   let mut lastError : TranslationError := .emptyResponse
 
   for _ in [:agent.config.maxRetries] do

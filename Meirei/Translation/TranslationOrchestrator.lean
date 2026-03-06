@@ -293,7 +293,8 @@ def TranslationOrchestrator.translateCodes
 /-- Generate a text report from batch results -/
 def BatchResult.toReport (batch : BatchResult) : String :=
   let header := "=== Translation Batch Report ==="
-  let summary := s!"Total: {batch.summary.totalRequests} | Success: {batch.summary.successCount} | Failed: {batch.summary.failureCount}"
+  let summary := s!"Total: {batch.summary.totalRequests} | " ++
+    s!"Success: {batch.summary.successCount} | Failed: {batch.summary.failureCount}"
   let tokens := s!"Tokens: {batch.summary.totalInputTokens} in / {batch.summary.totalOutputTokens} out"
   let confidence := match batch.summary.averageConfidence with
     | some c => s!"Average Confidence: {c}"

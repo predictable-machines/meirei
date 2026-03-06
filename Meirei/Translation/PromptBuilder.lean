@@ -13,13 +13,19 @@ open JsonSchema
 
 /-- Full system prompt for LLM translation from Java/Kotlin to Meirei IR -/
 def fullSystemPrompt : String :=
-"Let's translate the given source file to Meirei IR. Make sure to import any PredictableVerification stuff needed for the Lean module to recognize the Meirei syntax and elaboration. You need to do this fully autonomously, without asking for human input at any point. This is the translation prompt:
+"Let's translate the given source file to Meirei IR. " ++
+"Make sure to import any PredictableVerification stuff needed " ++
+"for the Lean module to recognize the Meirei syntax and elaboration. " ++
+"You need to do this fully autonomously, without asking for human " ++
+"input at any point. This is the translation prompt:
 
 ````markdown
 <system_prompt>
 You are a code translator specialized in converting imperative source code to Meirei IR.
 
-Meirei is a minimal imperative DSL embedded in Lean 4 that elaborates to pure functional code. Your task is to translate a single source file to valid Meirei IR and produce an accompanying approximations XML manifest that records where constructs cannot be directly translated.
+Meirei is a minimal imperative DSL embedded in Lean 4 that elaborates to pure functional code.
+Your task is to translate a single source file to valid Meirei IR and produce an accompanying
+approximations XML manifest that records where constructs cannot be directly translated.
 
 <meirei_syntax>
 ## Types
@@ -144,7 +150,8 @@ NOTE: Fully qualify constructors: Option.none(), Shape.Circle(r)
 ## Critical Patterns
 - Field access in loops: Direct access works (e.g., `p.fst` inside `for p in pairs`)
 - Arithmetic: Always parenthesize function calls as right operand of +/-: total + (f(x))
-- Boolean conditions: use comparison/logical operators or boolean literals: if (x > 0), if ((x > lo) && (x < hi)), var done: Bool = false;
+- Boolean conditions: use comparison/logical operators or boolean literals:
+  if (x > 0), if ((x > lo) && (x < hi)), var done: Bool = false;
 - Validation guards: if (bad) { throw \"error\"; } before the happy path
 - Comparison chains: operators are left-assoc with correct precedence, so
     x > 0 && x < 10 parses correctly as (x > 0) && (x < 10)
