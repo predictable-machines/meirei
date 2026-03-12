@@ -112,9 +112,9 @@ def TranslationAgent.translate (agent : TranslationAgent) (request : Translation
       let result ← flow.awaitResult
       let state ← flow.currentState
       match result with
-      | none =>
-        return .error (.llmError "No response from LLM")
-      | some llmResponse =>
+      | .error e =>
+        return .error (.llmError e)
+      | .ok llmResponse =>
         let agentMeta := state.metadata
         let tokenUsage : TokenUsage := {
           inputTokens := agentMeta.inputTokens

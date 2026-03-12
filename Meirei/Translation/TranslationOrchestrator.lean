@@ -1,318 +1,225 @@
 /-
   TranslationOrchestrator.lean
-  Orchestrator for managing batch translations of Java/Kotlin code to Meirei IR
+  Reactive orchestrator for batch code translation to Meirei IR.
 
-  Coordinates multiple TranslationAgent calls with configurable strategies.
+  Translates files sequentially using a single agent flow, matching the
+  schemas inference orchestrator pattern: one FlowProviderAdapter session
+  handles all files via successive user messages.
 -/
 
+import PredictableAgents.Provider.ClaudeCLI
+import PredictableCore.Shared.Index
 import PredictableVerification.Translation.TranslationTypes
-import PredictableVerification.Translation.TranslationAgent
+import PredictableVerification.Translation.PromptBuilder
+import Flow.ReactiveProgram
+import Flow.Index
 
 namespace PredictableVerification.Translation
 
--- ============================================================================
--- ORCHESTRATION STRATEGY
--- ============================================================================
+open Agents.Provider Agents.Provider.ClaudeCLI Agents.Parameters
+open Agents.Error
+open PredictableCore.Shared
+open Flow.Core
 
-/-- Strategy for orchestrating multiple translations -/
-inductive OrchestrationStrategy where
-  | sequential : OrchestrationStrategy
-      -- Translate one by one in order. Simple and predictable.
-  | parallel : OrchestrationStrategy
-      -- Translate multiple files concurrently. Faster but uses more resources.
-  | dependencyAware : OrchestrationStrategy
-      -- Analyze dependencies and translate in topological order.
-  | adaptive : OrchestrationStrategy
-      -- Start sequential, switch to parallel if no dependencies detected.
+/-- Result of translating a single file in the reactive pipeline. -/
+structure TranslateFileResult where
+  sourcePath : System.FilePath
+  outputPath : System.FilePath
+  success : Bool
+  -- Stored as a string because ConfidenceLevel has no ToJson instance.
+  confidence : Option String
+  error : Option String
+  deriving Lean.ToJson
 
-/-- Convert strategy to string for logging -/
-def OrchestrationStrategy.toString : OrchestrationStrategy → String
-  | .sequential => "sequential"
-  | .parallel => "parallel"
-  | .dependencyAware => "dependency-aware"
-  | .adaptive => "adaptive"
+/-- Aggregated result of the reactive translation orchestration. -/
+structure TranslateOrchestrationResult where
+  results : Array TranslateFileResult
+  deriving Lean.ToJson
 
-instance : ToString OrchestrationStrategy := ⟨OrchestrationStrategy.toString⟩
+-- Events for the reactive translation pipeline.
+-- processNext reads the current file and sends it to the agent.
+-- responseReceived carries the raw LLM output; handleResponseReceived uses
+-- state (current index) to build the per-file result and write the output file.
+-- fileTranslated carries the processed result and drives loop advancement.
+private inductive TranslateEvent where
+  | processNext
+  | responseReceived : LLMTranslationResponse → TranslateEvent
+  | fileTranslated : TranslateFileResult → TranslateEvent
+  | completed
+  | failed : String → TranslateEvent
 
--- ============================================================================
--- ORCHESTRATOR CONFIGURATION
--- ============================================================================
-
-/-- Configuration for the TranslationOrchestrator -/
-structure OrchestratorConfig where
-  strategy : OrchestrationStrategy
-  agentConfig : TranslationAgentConfig
-  stopOnError : Bool
-  maxConcurrent : Nat
+-- Reactive loop state.
+-- `result` is populated only when all files have been processed, signalling closure.
+private structure TranslateLoopState where
+  files : Array System.FilePath
+  outputDir : System.FilePath
   verbose : Bool
+  results : Array TranslateFileResult
+  result : Option TranslateOrchestrationResult
 
-/-- Default orchestrator configuration -/
-def OrchestratorConfig.default : OrchestratorConfig := {
-  strategy := .sequential
-  agentConfig := TranslationAgentConfig.default
-  stopOnError := false
-  maxConcurrent := 4
-  verbose := false
-}
+-- Files are processed one at a time via a single-source flow, so merge is never called.
+-- BEq compares result counts only — sufficient for the sequential single-source case.
+private instance : BEq TranslateLoopState where
+  beq a b :=
+    a.files.size == b.files.size &&
+    a.results.size == b.results.size &&
+    a.result.isSome == b.result.isSome
 
--- ============================================================================
--- BATCH TYPES
--- ============================================================================
+private instance : Flows.MergeableState TranslateLoopState where
+  merge _ new _ := new
+  withEmptyAppendable s := s
 
-/-- Result of translating a single item in a batch -/
-structure BatchItemResult where
-  request : TranslationRequest
-  outcome : TranslationOutcome
-  index : Nat
+-- `fileTranslated` pushes the per-file result; `completed` sets the terminal result.
+-- All other events are no-ops in the pure state transition.
+private def translateUpdate
+    (state : TranslateLoopState)
+    (event : TranslateEvent)
+    : TranslateLoopState :=
+  match event with
+  | .fileTranslated result => { state with results := state.results.push result }
+  | .completed => { state with result := some { results := state.results } }
+  | _ => state
 
-/-- Check if a batch item succeeded -/
-def BatchItemResult.isSuccess (item : BatchItemResult) : Bool :=
-  match item.outcome with
-  | .ok _ => true
-  | .error _ => false
+-- Converts agent flow events to pipeline events.
+-- The LLM response is passed through verbatim so handleResponseReceived can
+-- use state (current file index) to build the per-file result.
+private def translateAgentEvent
+    : Except AgentError (AgentRequestEvent LLMTranslationResponse)
+    → Option (Except BaseError TranslateEvent)
+  | .ok (.chunk llmResp) => some (.ok (.responseReceived llmResp))
+  | .error e => some (.ok (.failed (toString e)))
+  | _ => none
 
-/-- Get the translation result if successful -/
-def BatchItemResult.getResult? (item : BatchItemResult) : Option TranslationResult :=
-  match item.outcome with
-  | .ok result => some result
-  | .error _ => none
+private def baseName (path : System.FilePath) : String :=
+  let filename := path.fileName.getD "unknown"
+  match filename.splitOn "." with
+  | name :: _ => name
+  | [] => filename
 
-/-- Get the error if failed -/
-def BatchItemResult.getError? (item : BatchItemResult) : Option TranslationError :=
-  match item.outcome with
-  | .ok _ => none
-  | .error err => some err
+private def languageFromPath (path : System.FilePath) : SourceLanguage :=
+  match path.extension with
+  | some "kt" => .kotlin
+  | _ => .java
 
-/-- Summary statistics for a batch translation -/
-structure BatchSummary where
-  totalRequests : Nat
-  successCount : Nat
-  failureCount : Nat
-  totalInputTokens : Nat
-  totalOutputTokens : Nat
-  averageConfidence : Option Float
+private def generateHeader
+    (sourcePath : System.FilePath)
+    (lang : SourceLanguage)
+    (confidence : ConfidenceLevel)
+    : String :=
+  s!"/-\n  Auto-generated by: predictable translate\n  Source: {sourcePath}\n" ++
+  s!"  Language: {lang}\n  Confidence: {confidence}\n-/\n\n"
 
-/-- Compute summary from batch results -/
-def BatchSummary.fromResults (results : List BatchItemResult) : BatchSummary :=
-  let successes := results.filter BatchItemResult.isSuccess
-  let failures := results.filter (not ∘ BatchItemResult.isSuccess)
-
-  let tokenStats := successes.foldl (fun (inTok, outTok) item =>
-    match item.getResult? with
-    | some r => (inTok + r.tokenUsage.inputTokens, outTok + r.tokenUsage.outputTokens)
-    | none => (inTok, outTok)
-  ) (0, 0)
-
-  let confidenceSum := successes.foldl (fun acc item =>
-    match item.getResult? with
-    | some r => acc + r.confidence.toNat.toFloat
-    | none => acc
-  ) 0.0
-
-  let avgConfidence := if successes.isEmpty then none
-    else some (confidenceSum / successes.length.toFloat)
-
-  {
-    totalRequests := results.length
-    successCount := successes.length
-    failureCount := failures.length
-    totalInputTokens := tokenStats.1
-    totalOutputTokens := tokenStats.2
-    averageConfidence := avgConfidence
-  }
-
-/-- Result of a batch translation operation -/
-structure BatchResult where
-  results : List BatchItemResult
-  summary : BatchSummary
-
-/-- Check if all translations in batch succeeded -/
-def BatchResult.allSucceeded (batch : BatchResult) : Bool :=
-  batch.summary.failureCount == 0
-
-/-- Get all successful translations -/
-def BatchResult.successes (batch : BatchResult) : List TranslationResult :=
-  batch.results.filterMap BatchItemResult.getResult?
-
-/-- Get all failed translations with their original requests -/
-def BatchResult.failures (batch : BatchResult) : List (TranslationRequest × TranslationError) :=
-  batch.results.filterMap (fun item =>
-    match item.getError? with
-    | some err => some (item.request, err)
-    | none => none
-  )
-
--- ============================================================================
--- ORCHESTRATOR
--- ============================================================================
-
-/-- The TranslationOrchestrator manages batch translations -/
-structure TranslationOrchestrator where
-  config : OrchestratorConfig
-  agent : TranslationAgent
-
-/-- Create a new TranslationOrchestrator -/
-def TranslationOrchestrator.create (config : OrchestratorConfig := .default) : TranslationOrchestrator :=
-  let agent := TranslationAgent.create config.agentConfig
-  { config := config, agent := agent }
-
-/-- Create with custom agent -/
-def TranslationOrchestrator.createWithAgent
-    (agent : TranslationAgent)
-    (config : OrchestratorConfig := .default) : TranslationOrchestrator :=
-  { config := config, agent := agent }
-
--- ============================================================================
--- STRATEGY IMPLEMENTATIONS
--- ============================================================================
-
-/-- Sequential translation: one by one in order -/
-private def translateSequential
-    (orchestrator : TranslationOrchestrator)
-    (requests : List TranslationRequest) : IO BatchResult := do
-  let mut results : List BatchItemResult := []
-  let mut index := 0
-
-  for request in requests do
-    if orchestrator.config.verbose then
-      let name := request.methodName.getD s!"request_{index}"
-      IO.println s!"[Orchestrator] Translating {index + 1}/{requests.length}: {name}"
-
-    let outcome ← orchestrator.agent.translateWithRetry request
-
-    let itemResult : BatchItemResult := {
-      request := request
-      outcome := outcome
-      index := index
-    }
-
-    results := results ++ [itemResult]
-
-    -- Check if we should stop on error
-    if orchestrator.config.stopOnError then
-      match outcome with
-      | .error err =>
-        if orchestrator.config.verbose then
-          IO.println s!"[Orchestrator] Stopping due to error: {err}"
-        break
-      | .ok _ => pure ()
-
-    index := index + 1
-
-  let summary := BatchSummary.fromResults results
-
-  if orchestrator.config.verbose then
-    IO.println s!"[Orchestrator] Batch complete: {summary.successCount}/{summary.totalRequests} succeeded"
-
-  return { results := results, summary := summary }
-
-/-- Parallel translation: placeholder for future implementation -/
-private def translateParallel
-    (orchestrator : TranslationOrchestrator)
-    (requests : List TranslationRequest) : IO BatchResult := do
-  -- TODO: Implement parallel translation using Task.spawn
-  -- For now, fall back to sequential
-  if orchestrator.config.verbose then
-    IO.println "[Orchestrator] Parallel strategy not yet implemented, using sequential"
-  translateSequential orchestrator requests
-
-/-- Dependency-aware translation: placeholder for future implementation -/
-private def translateDependencyAware
-    (orchestrator : TranslationOrchestrator)
-    (requests : List TranslationRequest) : IO BatchResult := do
-  -- TODO: Implement dependency analysis and topological sort
-  -- For now, fall back to sequential
-  if orchestrator.config.verbose then
-    IO.println "[Orchestrator] Dependency-aware strategy not yet implemented, using sequential"
-  translateSequential orchestrator requests
-
-/-- Adaptive translation: placeholder for future implementation -/
-private def translateAdaptive
-    (orchestrator : TranslationOrchestrator)
-    (requests : List TranslationRequest) : IO BatchResult := do
-  -- TODO: Implement adaptive strategy selection
-  -- For now, fall back to sequential
-  if orchestrator.config.verbose then
-    IO.println "[Orchestrator] Adaptive strategy not yet implemented, using sequential"
-  translateSequential orchestrator requests
-
--- ============================================================================
--- PUBLIC API
--- ============================================================================
-
-/-- Translate a batch of requests using the configured strategy -/
-def TranslationOrchestrator.translateBatch
-    (orchestrator : TranslationOrchestrator)
-    (requests : List TranslationRequest) : IO BatchResult := do
-  if requests.isEmpty then
-    return {
-      results := []
-      summary := {
-        totalRequests := 0
-        successCount := 0
-        failureCount := 0
-        totalInputTokens := 0
-        totalOutputTokens := 0
-        averageConfidence := none
-      }
-    }
-
-  if orchestrator.config.verbose then
-    IO.println s!"[Orchestrator] Starting batch translation of {requests.length} requests"
-    IO.println s!"[Orchestrator] Strategy: {orchestrator.config.strategy}"
-
-  match orchestrator.config.strategy with
-  | .sequential => translateSequential orchestrator requests
-  | .parallel => translateParallel orchestrator requests
-  | .dependencyAware => translateDependencyAware orchestrator requests
-  | .adaptive => translateAdaptive orchestrator requests
-
-/-- Translate a single request (convenience method) -/
-def TranslationOrchestrator.translate
-    (orchestrator : TranslationOrchestrator)
-    (request : TranslationRequest) : IO TranslationOutcome :=
-  orchestrator.agent.translateWithRetry request
-
-/-- Translate multiple source code strings (convenience method) -/
-def TranslationOrchestrator.translateCodes
-    (orchestrator : TranslationOrchestrator)
-    (codes : List String)
-    (language : SourceLanguage := .java) : IO BatchResult := do
-  let requests := codes.mapIdx (fun idx code => {
-    sourceCode := code
-    language := language
-    context := none
-    methodName := some s!"method_{idx}"
-  })
-  orchestrator.translateBatch requests
-
--- ============================================================================
--- REPORTING
--- ============================================================================
-
-/-- Generate a text report from batch results -/
-def BatchResult.toReport (batch : BatchResult) : String :=
-  let header := "=== Translation Batch Report ==="
-  let summary := s!"Total: {batch.summary.totalRequests} | " ++
-    s!"Success: {batch.summary.successCount} | Failed: {batch.summary.failureCount}"
-  let tokens := s!"Tokens: {batch.summary.totalInputTokens} in / {batch.summary.totalOutputTokens} out"
-  let confidence := match batch.summary.averageConfidence with
-    | some c => s!"Average Confidence: {c}"
-    | none => "Average Confidence: N/A"
-
-  let failures := if batch.summary.failureCount > 0 then
-    let failureLines := batch.failures.map (fun (req, err) =>
-      let name := req.methodName.getD "unnamed"
-      s!"  - {name}: {err}"
-    )
-    "\nFailures:\n" ++ String.intercalate "\n" failureLines
+-- Sends the current file's source to the agent flow.
+-- Current file index = state.results.size (number of files already processed).
+private def handleProcessNext
+    (agentFlow : AgentRequestFlow LLMTranslationResponse)
+    (accessor : FlowAccessor BaseError TranslateEvent)
+    (state : TranslateLoopState)
+    : ReaderT PredictableConfig (ExceptT BaseError IO) Unit := do
+  let idx := state.results.size
+  if h : idx < state.files.size then
+    let sourcePath := state.files[idx]
+    let total := state.files.size
+    SideEffect.logInfo s!"  [{idx + 1}/{total}] {baseName sourcePath}"
+    let sourceCode ← IO.FS.readFile sourcePath
+    let lang := languageFromPath sourcePath
+    let request : TranslationRequest :=
+      { sourceCode, language := lang, context := none, methodName := some (baseName sourcePath) }
+    agentFlow.emit (.message (.user request.toXML))
   else
-    ""
+    accessor.emit .completed
 
-  s!"{header}\n{summary}\n{tokens}\n{confidence}{failures}"
+-- Processes the LLM response for the current file: writes the output file and emits
+-- fileTranslated so `update` can advance state.results.
+private def handleResponseReceived
+    (resp : LLMTranslationResponse)
+    (accessor : FlowAccessor BaseError TranslateEvent)
+    (state : TranslateLoopState)
+    : ReaderT PredictableConfig (ExceptT BaseError IO) Unit := do
+  let idx := state.results.size
+  if h : idx < state.files.size then
+    let sourcePath := state.files[idx]
+    let lang := languageFromPath sourcePath
+    let outputPath := state.outputDir / (baseName sourcePath ++ ".lean")
+    let translationResult := resp.toTranslationResult TokenUsage.empty "claude-sonnet-4-20250514" none
+    let header := generateHeader sourcePath lang translationResult.confidence
+    let content := header ++ translationResult.meireiCode
+    IO.FS.writeFile outputPath content
+    if state.verbose then
+      SideEffect.logInfo s!"      Confidence: {translationResult.confidence}"
+    accessor.emit <| .fileTranslated
+      { sourcePath, outputPath, success := true
+        confidence := some (toString translationResult.confidence), error := none }
+  else
+    accessor.emit .completed
 
-/-- Print batch report to stdout -/
-def BatchResult.printReport (batch : BatchResult) : IO Unit :=
-  IO.println batch.toReport
+private def translateSideEffect
+    (agentFlow : AgentRequestFlow LLMTranslationResponse)
+    (state : TranslateLoopState)
+    (event : TranslateEvent)
+    (accessor : FlowAccessor BaseError TranslateEvent)
+    : ReaderT PredictableConfig (ExceptT BaseError IO) Unit :=
+  match event with
+  | .processNext => handleProcessNext agentFlow accessor state
+  | .responseReceived resp => handleResponseReceived resp accessor state
+  -- state.results is already updated by `update` for fileTranslated; decide whether to continue.
+  | .fileTranslated _ =>
+    if state.results.size >= state.files.size then
+      accessor.emit .completed
+    else
+      accessor.emit .processNext
+  | .completed => accessor.close
+  | .failed msg => do
+    let idx := state.results.size
+    SideEffect.logWarn s!"Translation failed for file {idx + 1}: {msg}"
+    if h : idx < state.files.size then
+      let sourcePath := state.files[idx]
+      let outputPath := state.outputDir / (baseName sourcePath ++ ".lean")
+      -- Emit the error result so `update` advances state.results and the loop continues.
+      accessor.emit <| .fileTranslated
+        { sourcePath, outputPath, success := false, confidence := none, error := some msg }
+    else
+      accessor.emit .completed
+
+/-- Reactive batch translation orchestrator.
+    Translates all files sequentially via a single agent flow,
+    writing output to outputDir as each file completes. -/
+def orchestrateTranslation
+    (files : Array System.FilePath)
+    (outputDir : System.FilePath)
+    (verbose : Bool := false)
+    : PredictableCodeProgram TranslateOrchestrationResult := do
+  if files.isEmpty then
+    return { results := #[] }
+
+  let pConfig ← PredictableProgram.ask
+  let agentConfig : AgentRequestConfig :=
+    { config := ProviderConfig.default
+      params := RequestParameters.default
+      logTargets := pConfig.logTargets
+      colorEnabled := pConfig.colorEnabled
+      basePath := pConfig.basePath }
+  let adapter := createFlowAdapter agentConfig
+  let systemPrompt := buildStructuredPrompt .full allExamples
+  let agentFlow ← liftIOExcept <|
+    adapter.startStructured (α := LLMTranslationResponse) systemPrompt
+
+  let initialState : TranslateLoopState :=
+    { files, outputDir, verbose, results := #[], result := none }
+
+  let finalState ← ReactiveProgram.launchReactiveProgram
+    { initialState
+      update := translateUpdate
+      sideEffect := translateSideEffect agentFlow
+      firstMessage := TranslateEvent.processNext
+      onUpdated := fun _ => pure ()
+      sources := #[IOSubscribable.mapped agentFlow.underlying translateAgentEvent]
+      onClose := #[agentFlow.close] }
+
+  finalState
+  |>.bind (·.result)
+  |>.getDM <| Except.error <|
+    BaseError.llmFailure
+    "Translation reactive loop terminated without producing a result"
 
 end PredictableVerification.Translation
