@@ -94,6 +94,7 @@ def TranslationAgent.translate (agent : TranslationAgent) (request : Translation
       [{ target := .console, level := .error }]
     colorEnabled := true
     basePath := ""
+    skipPermissionsRef := none
   }
 
   let adapter := createFlowAdapter agentConfig
