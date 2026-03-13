@@ -199,7 +199,8 @@ def orchestrateTranslation
       logTargets := pConfig.logTargets
       colorEnabled := pConfig.colorEnabled
       basePath := pConfig.basePath
-      skipPermissionsRef := none }
+      skipPermissionsRef := none
+      allowedToolsRef := none }
   let adapter := createFlowAdapter agentConfig
   let systemPrompt := buildStructuredPrompt .full allExamples
   let agentFlow ← liftIOExcept <|
