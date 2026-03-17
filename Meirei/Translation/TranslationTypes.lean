@@ -31,24 +31,12 @@ open JsonSchema
     methodName : Option String     -- For tracking/logging
   deriving Repr
 
-  /-- JSON format reminder for user prompt -/
-  def jsonFormatReminder : String :=
-    "IMPORTANT: Respond ONLY with a JSON object using EXACTLY these field names: " ++
-    "meirei_code, confidence, approximations, notes. " ++
-    "No explanatory text. No markdown. Start directly with the opening brace."
-
-  /-- Build XML format for the LLM prompt -/
-  def TranslationRequest.toXML (req : TranslationRequest) : String :=
+  /-- Build the user prompt from the translation request -/
+  def TranslationRequest.toPrompt (req : TranslationRequest) : String :=
     let contextSection := match req.context with
-      | some ctx => s!"\n  <context>\n{ctx}\n  </context>"
+      | some ctx => s!"\n\nContext:\n{ctx}"
       | none => ""
-    s!"<translation_request>
-  <source language=\"{req.language}\">
-{req.sourceCode}
-  </source>{contextSection}
-</translation_request>
-
-{jsonFormatReminder}"
+    s!"Translate the following {req.language} code to Meirei IR:{contextSection}\n\n{req.sourceCode}"
 
   /-- Approximation type for metadata -/
   inductive ApproximationType where
@@ -171,7 +159,7 @@ open JsonSchema
   /-- Approximation as returned by Claude in JSON -/
   structure LLMApproximation where
     type : String
-    location : Option String
+    location : String
     description : String
     severity : String
   deriving Repr, BEq, Lean.ToJson, Lean.FromJson, HasJSONSchema
@@ -194,7 +182,7 @@ open JsonSchema
       | "high" => SeverityLevel.high
       | _ => SeverityLevel.medium
     { type := approxType
-      location := approx.location
+      location := if approx.location.isEmpty then none else some approx.location
       description := approx.description
       severity := severityLevel }
 
@@ -203,7 +191,7 @@ open JsonSchema
     meirei_code : String
     confidence : String
     approximations : List LLMApproximation
-    notes : Option String
+    notes : String
   deriving Repr, BEq, Lean.ToJson, Lean.FromJson, HasJSONSchema
 
   /-- Convert LLM response to our TranslationResult -/
@@ -218,9 +206,8 @@ open JsonSchema
       | "low" => ConfidenceLevel.low
       | _ => ConfidenceLevel.medium
     let approximations := response.approximations.map LLMApproximation.toApproximationInfo
-    let warnings := match response.notes with
-      | some note => [{ code := "N001", message := note, suggestion := none : TranslationWarning }]
-      | none => []
+    let warnings := if response.notes.isEmpty then []
+      else [{ code := "N001", message := response.notes, suggestion := none : TranslationWarning }]
     { meireiCode := response.meirei_code
       confidence := confidence
       approximations := approximations

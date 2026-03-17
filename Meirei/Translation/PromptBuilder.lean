@@ -641,25 +641,28 @@ def structuredOutputInstructions : String :=
 "
 ## Output Format
 
-You MUST respond with a valid JSON object. Do NOT include any text before or after the JSON.
-Do NOT wrap the JSON in markdown code blocks.
+CRITICAL: You have a StructuredOutput tool available. " ++
+"You MUST call it IMMEDIATELY as your very first action " ++
+"with the translation result. Do NOT emit any text, explanation, " ++
+"analysis, or commentary before or after the tool call. " ++
+"Do NOT use any other tools. " ++
+"Your entire response must consist of a single " ++
+"StructuredOutput tool call and nothing else.
 
-The JSON must have this exact structure:
-```json
+The StructuredOutput tool accepts a JSON object with this exact structure:
 {
   \"meirei_code\": \"<the translated Meirei IR code as a string>\",
   \"confidence\": \"high\" | \"medium\" | \"low\",
   \"approximations\": [
     {
       \"type\": \"<approximation_type>\",
-      \"location\": \"<optional: where in source>\",
+      \"location\": \"<where in source>\",
       \"description\": \"<what was approximated>\",
       \"severity\": \"low\" | \"medium\" | \"high\"
     }
   ],
-  \"notes\": \"<optional: any additional notes>\"
+  \"notes\": \"<any additional notes or empty string>\"
 }
-```
 
 ### Confidence Levels
 - **high**: Direct semantic mapping, no significant approximations
@@ -675,16 +678,6 @@ The JSON must have this exact structure:
 - **nullability**: Null handling approximated
 - **collections**: Collection bounds not checked
 - **external_call**: External call behavior assumed
-
-### Example Response
-```json
-{
-  \"meirei_code\": \"def add (a : Int) (b : Int) : Int := a + b\",
-  \"confidence\": \"high\",
-  \"approximations\": [],
-  \"notes\": null
-}
-```
 "
 
 /-- Build prompt with structured output instructions -/
