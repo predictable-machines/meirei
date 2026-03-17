@@ -85,7 +85,7 @@ def TranslationAgent.translate (agent : TranslationAgent) (request : Translation
     model := agent.config.model
     maxTurns := some 1
     verbose := agent.config.verbose
-    allowTools := false
+    allowedTools := []
     thinkingEnabled := false
   }
   let agentConfig : AgentRequestConfig := {
