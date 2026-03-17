@@ -34,12 +34,12 @@ structure TranslationAgentConfig where
 
 /-- Default configuration -/
 def TranslationAgentConfig.default : TranslationAgentConfig := {
-  model := "claude-sonnet-4-20250514"
+  model := "claude-haiku-4-5-20251001"
   maxTokens := 4096
   temperature := 0.0
   maxRetries := 3
   timeoutMs := 120000
-  verbose := false
+  verbose := true
   promptLevel := .full
   includeFewShot := true
 }
@@ -72,7 +72,7 @@ def TranslationAgent.translate (agent : TranslationAgent) (request : Translation
     return .error (.invalidInput "Source code is empty")
 
   -- Build the prompt with XML-formatted request
-  let userPrompt := request.toXML
+  let userPrompt := request.toPrompt
 
   if agent.config.verbose then
     IO.println s!"[TranslationAgent] Translating {request.methodName.getD "unnamed"} method"
@@ -84,6 +84,9 @@ def TranslationAgent.translate (agent : TranslationAgent) (request : Translation
     ProviderConfig.default with
     model := agent.config.model
     maxTurns := some 1
+    verbose := agent.config.verbose
+    allowedTools := []
+    thinkingEnabled := false
   }
   let agentConfig : AgentRequestConfig := {
     config := providerConfig
