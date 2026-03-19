@@ -231,9 +231,9 @@ partial def elabSimpleFold
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   -- Optimize simple patterns: single assignment, if-then with assignment,
@@ -288,9 +288,9 @@ partial def elabEarlyReturnLoop
   -- Build fold context with early return flag set
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true, inEarlyReturnLoop := true }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   -- Elaborate loop body (returns will be wrapped in Option.some)
@@ -330,9 +330,9 @@ partial def elabBreakLoop
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true, inBreakLoop := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   -- Elaborate body with break handling
@@ -371,9 +371,9 @@ partial def elabMixedReturnLoop
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   -- Special handling for mixed return + accumulation pattern
@@ -451,9 +451,9 @@ partial def elabEffectfulLoop
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true, hasEffectfulOps := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   let bodyExpr ← elabEffectfulFoldBody body varName
@@ -493,9 +493,9 @@ partial def elabTupleFold
   foldCtx := { foldCtx with inLoop := true }
   for (varName, varInfo) in modifiedVars do
     foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   -- Elaborate all statements in loop body
@@ -644,9 +644,9 @@ partial def elabExceptFold
   let mut foldCtx := savedCtx
   foldCtx := { foldCtx with inLoop := true }
   foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   let bodyExpr ← elabExceptFoldBody body varName varIdent
@@ -737,9 +737,9 @@ partial def elabExceptTupleFold
   foldCtx := { foldCtx with inLoop := true }
   for (varName, varInfo) in modifiedVars do
     foldCtx := { foldCtx with vars := foldCtx.vars.insert varName { varInfo with currentVersion := 0 } }
-  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName
-    { name := loopVarName, type := (MeireiType.named `Int),
-      currentVersion := 0 } }
+  let loopVarInfo : VarInfo :=
+    { name := loopVarName, type := (MeireiType.named `Int), currentVersion := 0 }
+  foldCtx := { foldCtx with vars := foldCtx.vars.insert loopVarName loopVarInfo }
   set foldCtx
 
   let modifiedVarNames := modifiedVars.map (·.1)

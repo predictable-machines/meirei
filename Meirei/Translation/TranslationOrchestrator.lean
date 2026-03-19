@@ -52,6 +52,29 @@ private def baseName (path : System.FilePath) : String :=
   | name :: _ => name
   | [] => filename
 
+/-- Compute the output path for a translated file, mirroring the source directory
+    structure under outputDir. E.g. sourceRoot=/app/src, file=/app/src/com/Foo.java,
+    outputDir=verification/Code → verification/Code/com/Foo.lean -/
+private def outputPathForFile
+    (sourceRoot : System.FilePath)
+    (outputDir : System.FilePath)
+    (sourcePath : System.FilePath)
+    : System.FilePath :=
+  let rootStr := sourceRoot.toString
+  let fileStr := sourcePath.toString
+  -- Strip sourceRoot prefix to get relative path, then replace extension
+  let relPath : String := if fileStr.startsWith rootStr then
+    let stripped := (fileStr.drop rootStr.length).toString
+    -- Drop leading separator if present
+    if stripped.startsWith "/" then (stripped.drop 1).toString else stripped
+  else
+    sourcePath.fileName.getD "unknown"
+  let relFilePath : System.FilePath := relPath
+  let leanName := baseName relFilePath ++ ".lean"
+  match relFilePath.parent with
+  | some parent => outputDir / parent / leanName
+  | none => outputDir / leanName
+
 private def languageFromPath (path : System.FilePath) : SourceLanguage :=
   match path.extension with
   | some "kt" => .kotlin
@@ -70,6 +93,7 @@ private def generateHeader
 private def translateFileIO
     (agent : TranslationAgent)
     (sourcePath : System.FilePath)
+    (sourceRoot : System.FilePath)
     (outputDir : System.FilePath)
     (verbose : Bool := false)
     : IO TranslateFileResult := do
@@ -80,12 +104,14 @@ private def translateFileIO
   let request : TranslationRequest :=
     { sourceCode, language := lang, context := none
       methodName := some name }
-  let outputPath := outputDir / (name ++ ".lean")
+  let outputPath := outputPathForFile sourceRoot outputDir sourcePath
   if verbose then
     IO.eprintln s!"      Sending to LLM..."
   match ← agent.translateWithRetry request with
   | .ok result =>
     let header := generateHeader sourcePath lang result.confidence
+    if let some parent := outputPath.parent then
+      IO.FS.createDirAll parent
     IO.FS.writeFile outputPath (header ++ result.meireiCode)
     let elapsed := (← IO.monoMsNow) - startTime
     let approxCount := result.approximations.length
@@ -152,6 +178,7 @@ private def startSpinner
 -- Concurrency controls how many files are in-flight simultaneously.
 private def translateBatchParallel
     (misses : Array System.FilePath)
+    (sourceRoot : System.FilePath)
     (outputDir : System.FilePath)
     (verbose : Bool)
     (concurrency : Nat)
@@ -176,7 +203,7 @@ private def translateBatchParallel
           verbose := verbose }
       let agent := TranslationAgent.create agentConfig
       let task ← IO.asTask (prio := .dedicated) do
-        translateFileIO agent file outputDir verbose
+        translateFileIO agent file sourceRoot outputDir verbose
       tasks := tasks.push (idx, task)
     for (taskIdx, task) in tasks do
       let errResult : TranslateFileResult :=
@@ -206,6 +233,7 @@ private def translateBatchParallel
     instances (each spawning its own claude subprocess via IO.asTask). -/
 def orchestrateTranslation
     (files : Array System.FilePath)
+    (sourceRoot : System.FilePath)
     (outputDir : System.FilePath)
     (verbose : Bool := false)
     (concurrency : Nat := 1)
@@ -219,7 +247,7 @@ def orchestrateTranslation
 
   let results ←
     translateBatchParallel
-      files outputDir verbose effectiveConcurrency
+      files sourceRoot outputDir verbose effectiveConcurrency
 
   return { results }
 
