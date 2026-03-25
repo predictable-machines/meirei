@@ -5,7 +5,7 @@
   into executable Lean 4 functions using term-level syntax.
 -/
 
-import PredictableVerification.IR.Meirei.Elaborator.Index
+import Meirei.IR.Meirei.Elaborator.Index
 
 open Meirei
 

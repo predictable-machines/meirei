@@ -8,7 +8,7 @@
   lists, but name the operations "array" since they model imperative array access.
 -/
 
-import PredictableVerification.Examples.Functions.EffectMParameterized
+import Meirei.Examples.Functions.EffectMParameterized
 
 open EffectMParameterized
 

@@ -4,8 +4,8 @@
   This file proves functional correctness properties about order processing.
 -/
 
-import PredictableVerification.Examples.Functions.Effectful
-import PredictableVerification.Examples.Verification.Common
+import Meirei.Examples.Functions.Effectful
+import Meirei.Examples.Verification.Common
 
 open Effectful
 

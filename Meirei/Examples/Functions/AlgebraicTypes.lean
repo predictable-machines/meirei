@@ -5,7 +5,7 @@
   field access, constructor calls, and pattern matching.
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

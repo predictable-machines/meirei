@@ -1,2 +1,2 @@
-import PredictableVerification.IR.Index
-import PredictableVerification.Examples.Index
+import Meirei.IR.Index
+import Meirei.Examples.Index

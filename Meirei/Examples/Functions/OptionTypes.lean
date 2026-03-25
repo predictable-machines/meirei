@@ -7,7 +7,7 @@
   qualified Option.none()/Option.some(v) constructor syntax.
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

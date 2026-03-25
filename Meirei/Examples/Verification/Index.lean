@@ -1,8 +1,8 @@
-import PredictableVerification.Examples.Verification.Common
-import PredictableVerification.Examples.Verification.MySumContract
-import PredictableVerification.Examples.Verification.FindFirstContract
-import PredictableVerification.Examples.Verification.EarlyExitEquivalence
-import PredictableVerification.Examples.Verification.FibonacciEquivalence
-import PredictableVerification.Examples.Verification.EffectfulEquivalence
-import PredictableVerification.Examples.Verification.ProcessOrdersContract
-import PredictableVerification.Examples.Verification.ArrayAccessContracts
+import Meirei.Examples.Verification.Common
+import Meirei.Examples.Verification.MySumContract
+import Meirei.Examples.Verification.FindFirstContract
+import Meirei.Examples.Verification.EarlyExitEquivalence
+import Meirei.Examples.Verification.FibonacciEquivalence
+import Meirei.Examples.Verification.EffectfulEquivalence
+import Meirei.Examples.Verification.ProcessOrdersContract
+import Meirei.Examples.Verification.ArrayAccessContracts

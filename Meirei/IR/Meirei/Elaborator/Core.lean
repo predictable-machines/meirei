@@ -6,12 +6,12 @@
 -/
 
 import Lean
-import PredictableVerification.IR.Meirei.Syntax
-import PredictableVerification.IR.Meirei.Parser
-import PredictableVerification.IR.Meirei.Elaborator.Context
-import PredictableVerification.IR.Meirei.Elaborator.Functions
-import PredictableVerification.IR.Meirei.Elaborator.TypeDecls
-import PredictableVerification.IR.Meirei.Elaborator.EnvExtension
+import Meirei.IR.Meirei.Syntax
+import Meirei.IR.Meirei.Parser
+import Meirei.IR.Meirei.Elaborator.Context
+import Meirei.IR.Meirei.Elaborator.Functions
+import Meirei.IR.Meirei.Elaborator.TypeDecls
+import Meirei.IR.Meirei.Elaborator.EnvExtension
 
 open Lean Lean.Elab Lean.Meta
 

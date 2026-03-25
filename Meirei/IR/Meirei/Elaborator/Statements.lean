@@ -12,13 +12,13 @@
 -/
 
 import Lean
-import PredictableVerification.IR.Meirei.AST
-import PredictableVerification.IR.Meirei.Analysis
-import PredictableVerification.IR.Meirei.Elaborator.Context
-import PredictableVerification.IR.Meirei.Elaborator.Expressions
-import PredictableVerification.IR.Meirei.Elaborator.Tuples
-import PredictableVerification.IR.Meirei.Elaborator.LoopHelpers
-import PredictableVerification.IR.Meirei.Elaborator.Types
+import Meirei.IR.Meirei.AST
+import Meirei.IR.Meirei.Analysis
+import Meirei.IR.Meirei.Elaborator.Context
+import Meirei.IR.Meirei.Elaborator.Expressions
+import Meirei.IR.Meirei.Elaborator.Tuples
+import Meirei.IR.Meirei.Elaborator.LoopHelpers
+import Meirei.IR.Meirei.Elaborator.Types
 
 open Lean Lean.Elab Lean.Meta
 

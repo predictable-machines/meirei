@@ -14,7 +14,7 @@
   5. Variable assignments with special characters
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

@@ -5,7 +5,7 @@
   including as function arguments.
 -/
 
-import PredictableVerification.IR.Meirei.Elaborator.Index
+import Meirei.IR.Meirei.Elaborator.Index
 
 open Meirei
 

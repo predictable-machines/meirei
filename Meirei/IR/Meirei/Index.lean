@@ -1,6 +1,6 @@
-import PredictableVerification.IR.Meirei.Syntax
-import PredictableVerification.IR.Meirei.AST
-import PredictableVerification.IR.Meirei.Parser
-import PredictableVerification.IR.Meirei.PrintAST
-import PredictableVerification.IR.Meirei.Analysis
-import PredictableVerification.IR.Meirei.Elaborator.Index
+import Meirei.IR.Meirei.Syntax
+import Meirei.IR.Meirei.AST
+import Meirei.IR.Meirei.Parser
+import Meirei.IR.Meirei.PrintAST
+import Meirei.IR.Meirei.Analysis
+import Meirei.IR.Meirei.Elaborator.Index

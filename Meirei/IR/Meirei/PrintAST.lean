@@ -6,10 +6,10 @@
 -/
 
 import Lean
-import PredictableVerification.IR.Meirei.Syntax
-import PredictableVerification.IR.Meirei.Parser
-import PredictableVerification.IR.Meirei.AST
-import PredictableVerification.IR.Meirei.Elaborator.EnvExtension
+import Meirei.IR.Meirei.Syntax
+import Meirei.IR.Meirei.Parser
+import Meirei.IR.Meirei.AST
+import Meirei.IR.Meirei.Elaborator.EnvExtension
 
 open Lean
 

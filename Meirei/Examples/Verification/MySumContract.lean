@@ -5,8 +5,8 @@
   then the result is non-negative.
 -/
 
-import PredictableVerification.Examples.Functions.Advanced
-import PredictableVerification.Examples.Verification.Common
+import Meirei.Examples.Functions.Advanced
+import Meirei.Examples.Verification.Common
 
 -- =============================================================================
 -- MAIN RESULT: mySum_nonnegative_contract

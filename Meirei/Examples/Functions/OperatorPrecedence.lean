@@ -13,7 +13,7 @@
     30: ||
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

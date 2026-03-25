@@ -6,7 +6,7 @@
   and variable modification tracking.
 -/
 
-import PredictableVerification.IR.Meirei.AST
+import Meirei.IR.Meirei.AST
 
 open Lean
 

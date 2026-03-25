@@ -6,7 +6,7 @@
   version and satisfies the same properties.
 -/
 
-import PredictableVerification.Examples.Functions.Effectful
+import Meirei.Examples.Functions.Effectful
 
 open Effectful
 

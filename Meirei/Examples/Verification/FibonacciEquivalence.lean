@@ -9,7 +9,7 @@
   enabling verification of imperative-style code.
 -/
 
-import PredictableVerification.Examples.Functions.Fibonacci
+import Meirei.Examples.Functions.Fibonacci
 
 /-
   PATTERN: Fibonacci Sequence

@@ -5,7 +5,7 @@
   and logical operators (&&, ||, !) in Meirei.
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

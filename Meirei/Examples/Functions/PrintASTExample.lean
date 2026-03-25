@@ -5,7 +5,7 @@
   the intermediate AST representation before elaboration to Lean code.
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

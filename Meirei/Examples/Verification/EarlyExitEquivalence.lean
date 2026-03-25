@@ -9,7 +9,7 @@
   the original code exactly.
 -/
 
-import PredictableVerification.Examples.Functions.EarlyExit
+import Meirei.Examples.Functions.EarlyExit
 
 -- NOTE: Meirei has no built-in types. Type names must start with uppercase
 -- (e.g. Int, String, Shape). This matches Lean's conventions directly.

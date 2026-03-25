@@ -6,11 +6,11 @@
 -/
 
 import Lean
-import PredictableVerification.IR.Meirei.AST
-import PredictableVerification.IR.Meirei.Analysis
-import PredictableVerification.IR.Meirei.Elaborator.Context
-import PredictableVerification.IR.Meirei.Elaborator.Types
-import PredictableVerification.IR.Meirei.Elaborator.Statements
+import Meirei.IR.Meirei.AST
+import Meirei.IR.Meirei.Analysis
+import Meirei.IR.Meirei.Elaborator.Context
+import Meirei.IR.Meirei.Elaborator.Types
+import Meirei.IR.Meirei.Elaborator.Statements
 
 open Lean Lean.Elab Lean.Meta
 

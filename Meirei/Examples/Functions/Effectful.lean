@@ -1,4 +1,4 @@
-import PredictableVerification.IR.Meirei.Elaborator.Index
+import Meirei.IR.Meirei.Elaborator.Index
 
 namespace Effectful
 

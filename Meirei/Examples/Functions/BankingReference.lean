@@ -13,7 +13,7 @@
     Main.java             → Demo scenario as pure computation
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

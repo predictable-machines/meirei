@@ -7,7 +7,7 @@
   - If-else in normal loops (no early exit)
 -/
 
-import PredictableVerification.IR.Meirei.Elaborator.Index
+import Meirei.IR.Meirei.Elaborator.Index
 
 open Meirei
 

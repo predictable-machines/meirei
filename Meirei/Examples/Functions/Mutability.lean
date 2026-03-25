@@ -7,7 +7,7 @@
   versioned `_0` / `_1` identifiers produced by addVar / updateVar.
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

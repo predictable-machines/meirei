@@ -5,7 +5,7 @@
   compile the intSum and mySum examples to executable Lean 4 code.
 -/
 
-import PredictableVerification.IR.Meirei.Elaborator.Index
+import Meirei.IR.Meirei.Elaborator.Index
 
 open Meirei
 

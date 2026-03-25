@@ -7,8 +7,8 @@
 -/
 
 import Lean
-import PredictableVerification.IR.Meirei.AST
-import PredictableVerification.IR.Meirei.Elaborator.Context
+import Meirei.IR.Meirei.AST
+import Meirei.IR.Meirei.Elaborator.Context
 
 open Lean Lean.Elab Lean.Meta
 

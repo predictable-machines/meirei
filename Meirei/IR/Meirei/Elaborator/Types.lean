@@ -5,7 +5,7 @@
 -/
 
 import Lean
-import PredictableVerification.IR.Meirei.AST
+import Meirei.IR.Meirei.AST
 
 open Lean Lean.Elab Lean.Meta
 

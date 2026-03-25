@@ -6,8 +6,8 @@
 -/
 
 import Lean
-import PredictableVerification.IR.Meirei.Syntax
-import PredictableVerification.IR.Meirei.AST
+import Meirei.IR.Meirei.Syntax
+import Meirei.IR.Meirei.AST
 
 open Lean
 

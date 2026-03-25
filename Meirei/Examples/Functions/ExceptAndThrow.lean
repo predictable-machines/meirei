@@ -5,7 +5,7 @@
   Throw acts as early return wrapping in Except.error.
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 open Meirei
 

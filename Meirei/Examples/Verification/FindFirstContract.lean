@@ -12,7 +12,7 @@
   and then create a contract module for it, then prove that the function satisfies the property."
 -/
 
-import PredictableVerification.Examples.Functions.EarlyExit
+import Meirei.Examples.Functions.EarlyExit
 
 -- =============================================================================
 -- MAIN RESULT: findFirstGreaterThan10_contract

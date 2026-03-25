@@ -8,7 +8,7 @@
   - Edge cases for break and return patterns
 -/
 
-import PredictableVerification.IR.Meirei.Elaborator.Index
+import Meirei.IR.Meirei.Elaborator.Index
 
 open Meirei
 

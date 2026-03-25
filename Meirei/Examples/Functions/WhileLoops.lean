@@ -14,7 +14,7 @@
     cannot, remove `decreasing(...)` and fall back to `partial def`.
 -/
 
-import PredictableVerification.IR.Meirei.Index
+import Meirei.IR.Meirei.Index
 
 -- Example 1: Smallest power of 2 >= n (single variable)
 partial def nextPow2 := [Meirei|
