@@ -2,7 +2,7 @@ import Lake
 open Lake DSL
 
 package meirei where
-  version := v!"0.1.0"
+  version := v!"0.1.1"
 
 @[default_target]
 lean_lib Meirei where
